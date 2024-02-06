@@ -265,17 +265,17 @@ public class LocalCodeSandBox implements CodeSandBox {
 	 */
 	private static List<CodeExecuteResult> codeRun(String codeFileParentDir, List<String> inputList, Long timeLimit, Long memory) {
 		List<CodeExecuteResult> messages = new ArrayList<>();
+		String permissionCheckFilePath = System.getProperty("user.dir") + File.separator + "tempCodeRepository";
+		if (!Files.exists(Paths.get(permissionCheckFilePath + File.separator + "DenySecurity.class"))) {
+			compileDenyPermissionFile();
+		}
 		
 		ExecutorService executor = Executors.newFixedThreadPool(4);
 		List<Callable<CodeExecuteResult>> tasks = new ArrayList<>();
 		for (int i = 0; i < inputList.size(); i++) {
 			int index = i;
 			tasks.add(() -> {
-				String[] runCommand = ArrayUtil.append(JAVA_RUN_COMMAND, codeFileParentDir + ":"+ "/home/parallels/codeSandBox/src/main/resources/tmpCode/" ,"-Djava.security.manager=DenyPermission", "Main");
-				for (int j = 0 ; j < runCommand.length ; j ++) {
-					System.out.print(runCommand[j] + " ");
-				}
-				System.out.println();
+				String[] runCommand = ArrayUtil.append(JAVA_RUN_COMMAND, codeFileParentDir + ":"+ permissionCheckFilePath ,"-Djava.security.manager=DenyPermission", "Main");
 				var processBuilder = new ProcessBuilder(runCommand);
 				if (!inputList.get(index).trim().isEmpty()) {
 					processBuilder.redirectInput(new File(codeFileParentDir + File.separator + INPUT_NAME_PREFIX + index + ".txt"));
@@ -331,6 +331,23 @@ public class LocalCodeSandBox implements CodeSandBox {
 			executor.shutdownNow();
 		}
 		return messages;
+	}
+	/**
+	 * 编译权限校验文件
+	 * @return 编译后的 .class 文件所在目录
+	 */
+	private static String compileDenyPermissionFile() {
+		String userDir = System.getProperty("user.dir");
+		String classPath = userDir + File.separator + "tempCodeRepository";
+		String javaPath = userDir + File.separator +"src/main/resources/permission/DenyPermission.java";
+		var processBuilder = new ProcessBuilder(new String[]{"javac", "-d",classPath , javaPath});
+		try {
+			Process compilePermissionCheckFile = processBuilder.start();
+			compilePermissionCheckFile.waitFor();
+		} catch (IOException | InterruptedException e) {
+			e.printStackTrace();
+		}
+		return classPath;
 	}
 
 	/**

@@ -28,7 +28,7 @@ public class CodeSandBoxApplicationTests {
 		var localCodeSandBox = new LocalCodeSandBox();
 		var req = new DebugRequest();
 		req.setInput("2 5\n1 2\n2 4");  // 正确结果: 10;   错误输入测试: "4 5\n1 2\n2 4" "2 5\n1 2\n2 4"
-		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/tmpCode/Main.java";
+		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		req.setCode(code);
 		DebugResponse debugResponse = localCodeSandBox.codeDebug(req);
@@ -41,7 +41,7 @@ public class CodeSandBoxApplicationTests {
 		var judgeRequest = new JudgeRequest();
 		TestCase testCase0 = new TestCase(0,"2 5\n1 2\n2 4", "10");
 		TestCase testCase1 = new TestCase(1,"4 5\n1 2\n2 4\n3 4\n4 5", "10");
-		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/tmpCode/Main.java";
+		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		judgeRequest.setTestCases(List.of(testCase0, testCase1));
 		judgeRequest.setCode(code);
@@ -55,7 +55,7 @@ public class CodeSandBoxApplicationTests {
 		var dockerCodeSandBox = new DockerCodeSandBox();
 		var req = new DebugRequest();
 		req.setInput("2 5\n1 2\n2 4");  // 正确结果: 10;   错误输入测试: "4 5\n1 2\n2 4"
-		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/tmpCode/Main.java";
+		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		req.setCode(code);
 		DebugResponse debugResponse = dockerCodeSandBox.codeDebug(req);
@@ -67,7 +67,7 @@ public class CodeSandBoxApplicationTests {
 		var judgeRequest = new JudgeRequest();
 		TestCase testCase0 = new TestCase(0,"2 5\n1 2\n2 4", "10");
 		TestCase testCase1 = new TestCase(1,"4 5\n1 2\n2 4\n3 4\n4 5", "10");
-		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/tmpCode/Main.java";
+		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		judgeRequest.setTestCases(List.of(testCase0, testCase1));
 		judgeRequest.setCode(code);

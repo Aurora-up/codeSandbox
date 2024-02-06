@@ -59,7 +59,13 @@ public class DockerCodeSandBox implements CodeSandBox {
 		var respBuilder = DebugResponse.builder();
 		String code = debugRequest.getCode();
 		String input = debugRequest.getInput();
-		Path codeFileParentDir = tackleCodeStorageAndIsolation(code, Collections.singletonList(input));
+		List<String> inputList = new ArrayList<>();
+		if (input != null) {
+			inputList.add(input.trim());
+		} else {
+			inputList.add("");
+		}
+		Path codeFileParentDir = tackleCodeStorageAndIsolation(code, inputList);
 
 		/* 类库黑名单校验 */
 		Boolean isMaliciousCode = IsMaliciousCode(code);
@@ -87,7 +93,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 			dockerClient.startContainerCmd(containerId).exec(); // 启动容器
 		}
 
-		var codeExecuteResults = DockerCodeSandBox.codeRun(dockerClient, containerId, codeFileParentDir, List.of(input), TIME_LIMIT, Memory_LIMIT);
+		var codeExecuteResults = DockerCodeSandBox.codeRun(dockerClient, containerId, codeFileParentDir, inputList, TIME_LIMIT, Memory_LIMIT);
 		var codeRunResult = codeExecuteResults.get(0);
 		// AC
 		if (codeRunResult.getExitValue() == 0) {
@@ -108,8 +114,9 @@ public class DockerCodeSandBox implements CodeSandBox {
 		} else {
 			// 权限不足
 			codeFileClean(codeFileParentDir.toString());
+			String[] permissionException = codeRunResult.getErrorResult().split("#");
 			return respBuilder.resultStatus(1)
-					.resultMessage(codeRunResult.getErrorResult())
+					.resultMessage(permissionException[1])
 					.build();
 		}
 	}
@@ -364,7 +371,10 @@ public class DockerCodeSandBox implements CodeSandBox {
 	 */
 	private static List<CodeExecuteResult> codeRun(DockerClient dockerClient, String containerId, Path codeFileParentDir, List<String> inputList, Long timeLimit, Long memory) {
 		List<CodeExecuteResult> messages = new ArrayList<>();
-
+		String permissionCheckFilePath = System.getProperty("user.dir") + File.separator + "tempCodeRepository" + File.separator + "DenySecurity.class";
+		if (!Files.exists(Paths.get(permissionCheckFilePath))) {
+			compileDenyPermissionFile();
+		}
 
 		final long[] maxMemory = { 0L };
 		StatsCmd statsCmd = dockerClient.statsCmd(containerId);
@@ -392,7 +402,9 @@ public class DockerCodeSandBox implements CodeSandBox {
 			int index = i;
 			tasks.add(() -> {
 				String[] runCommand = new String[]{"docker", "exec", "-i", containerId,
-						"java","-Xmx256m", "-cp", "/codeStore" + File.separator + codeFileParentDir.getFileName().toString(), "Main"};
+						"java","-Xmx256m", "-cp", "/codeStore" + File.separator + codeFileParentDir.getFileName().toString()+
+						":"+"/codeStore","-Djava.security.manager=DenyPermission", "Main"};
+
 
 				var processBuilder = new ProcessBuilder(runCommand);
 				if (!inputList.get(index).trim().isEmpty()) {
@@ -456,7 +468,23 @@ public class DockerCodeSandBox implements CodeSandBox {
 		return messages;
 	}
 
-
+	/**
+	 * 编译权限校验文件
+	 * @return 编译后的 .class 文件所在目录
+	 */
+	private static String compileDenyPermissionFile() {
+		String userDir = System.getProperty("user.dir");
+		String classPath = userDir + File.separator + "tempCodeRepository";
+		String javaPath = userDir + File.separator +"src/main/resources/permission/DenyPermission.java";
+		var processBuilder = new ProcessBuilder(new String[]{"javac", "-d",classPath , javaPath});
+		try {
+			Process compilePermissionCheckFile = processBuilder.start();
+			compilePermissionCheckFile.waitFor();
+		} catch (IOException | InterruptedException e) {
+			e.printStackTrace();
+		}
+		return classPath;
+	}
 
 	/**
 	 * 用户代码文件清理
@@ -484,6 +512,4 @@ public class DockerCodeSandBox implements CodeSandBox {
 			e.printStackTrace();
 		}
 	}
-
-
 }
