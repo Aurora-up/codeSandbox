@@ -36,6 +36,7 @@ import java.util.concurrent.*;
  */
 @Component
 @Slf4j
+@SuppressWarnings({"deprecation"})
 public class DockerCodeSandBox implements CodeSandBox {
 
 	private static final String JAVA_DOCKER_IMAGE = "openjdk:17.0-jdk";
@@ -178,6 +179,8 @@ public class DockerCodeSandBox implements CodeSandBox {
 							.passTestCasesNumber(passTestCasesNumber)
 							.resultMessage("Runtime Error")
 							.noPassTestCaseId(res.getTestCaseId())
+							.time(Math.max(time, res.getTime()))
+							.memory(Math.max(memory, res.getMemory()))
 							.build();
 				}
 			}
@@ -188,6 +191,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 						.resultMessage("Runtime Timeout")
 						.noPassTestCaseId(res.getTestCaseId())
 						.time(Long.MAX_VALUE)
+						.memory(Math.max(memory, res.getMemory()))
 						.build();
 				codeFileClean(codeFileParentDir.toString());
 				return judgeResponse;   // 有一个超时, 直接返回
@@ -283,7 +287,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		var pullImageResultCallback = new PullImageResultCallback() {
 			@Override
 			public void onNext(PullResponseItem item) {
-				log.info("下载镜像: " + item.getStatus());
+				log.info("下载镜像中: " + item.getStatus());
 				super.onNext(item);
 			}
 		};
@@ -313,6 +317,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		var containerInstance = containerCmd
 				.withHostConfig(hostConfig)
 				.withNetworkDisabled(true)
+				.withReadonlyRootfs(true)
 				.withAttachStdin(true)
 				.withAttachStdout(true)
 				.withAttachStderr(true)
@@ -380,7 +385,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		});
 		statsCmd.exec(statisticsResultCallback);
 
-		ExecutorService executor = Executors.newSingleThreadExecutor();
+		ExecutorService executor = Executors.newFixedThreadPool(4);
 		List<Callable<CodeExecuteResult>> tasks = new ArrayList<>();
 
 		for (int i = 0; i < inputList.size(); i++) {
@@ -416,7 +421,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 							.build();
 				} else {
 					stopWatch.stop(); // ----------------------------- 结束统计进程运行时间
-					exitValue = 4;    // Run Timeout
+					exitValue = 4;    // Runtime Timeout
 					message = messageBuilder.exitValue(exitValue)
 							.testCaseId(index)
 							.memory(maxMemory[0])

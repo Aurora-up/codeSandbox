@@ -8,7 +8,6 @@ import com.app.module.judge.JudgeResponse;
 import com.app.module.judge.TestCase;
 import com.app.service.impl.DockerCodeSandBox;
 import com.app.service.impl.LocalCodeSandBox;
-import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -18,7 +17,6 @@ import java.util.List;
 
 
 @SpringBootTest
-@Slf4j
 public class CodeSandBoxApplicationTests {
 
 	@Test
@@ -29,7 +27,7 @@ public class CodeSandBoxApplicationTests {
 	void localCodeSandBoxDebugTest() {
 		var localCodeSandBox = new LocalCodeSandBox();
 		var req = new DebugRequest();
-		req.setInput("2 5\n1 2\n2 4");  // 正确结果: 10;   错误输入测试: "4 5\n1 2\n2 4"
+		req.setInput("2 5\n1 2\n2 4");  // 正确结果: 10;   错误输入测试: "4 5\n1 2\n2 4" "2 5\n1 2\n2 4"
 		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/tmpCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		req.setCode(code);

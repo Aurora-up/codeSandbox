@@ -31,7 +31,7 @@ public class LocalCodeSandBox implements CodeSandBox {
 	private static final String CODE_STORE_ROOT_PATH = "tempCodeRepository";
 	private static final String EXECUTE_CODE_FILE_NAME = "Main.java";
 	private static final String[] JAVA_COMPILE_COMMAND = new String[]{"javac", "-encoding", "utf-8"};
-	private static final String[] JAVA_RUN_COMMAND = new String[]{"java", "-Xmx256m", "-Dfile.encoding=UTF-8", "-cp"};
+	private static final String[] JAVA_RUN_COMMAND = new String[]{"java","-Xmx256m", "-Dfile.encoding=UTF-8","-cp"};
 	private static final String INPUT_NAME_PREFIX = "input-";
 	private static final Long TIME_LIMIT = 3000L;  // 3s
 	private static final Long Memory_LIMIT = 256 * 1000 * 1000L; // 256MB
@@ -47,7 +47,13 @@ public class LocalCodeSandBox implements CodeSandBox {
 		var respBuilder = DebugResponse.builder();
 		String code = debugRequest.getCode();
 		String input = debugRequest.getInput();
-		String codeFileParentDir = tackleCodeStorageAndIsolation(code, Collections.singletonList(input));
+		List<String> inputList = new ArrayList<>();
+		if (input != null) {
+			inputList.add(input.trim());
+		} else {
+			inputList.add("");
+		}
+		String codeFileParentDir = tackleCodeStorageAndIsolation(code, inputList);
 
 		/* 类库黑名单校验 */
 		Boolean isMaliciousCode = IsMaliciousCode(code);
@@ -68,7 +74,7 @@ public class LocalCodeSandBox implements CodeSandBox {
 							.build();
 		}
 		/* 代码运行 */
-		var codeExecuteResults = codeRun(codeFileParentDir, Collections.singletonList(input), TIME_LIMIT, Memory_LIMIT);
+		var codeExecuteResults = codeRun(codeFileParentDir, inputList, TIME_LIMIT, Memory_LIMIT);
 		var codeRunResult = codeExecuteResults.get(0);
 		// AC
 		if (codeRunResult.getExitValue() == 0) {
@@ -89,8 +95,9 @@ public class LocalCodeSandBox implements CodeSandBox {
 		} else {
 			// 权限不足
 			codeFileClean(codeFileParentDir);
+			String[] permissionException = codeRunResult.getErrorResult().split("#");
 			return respBuilder.resultStatus(1)
-							.resultMessage(codeRunResult.getErrorResult())
+							.resultMessage(permissionException[1])
 							.build();
 		}
 	}
@@ -214,9 +221,11 @@ public class LocalCodeSandBox implements CodeSandBox {
 		String userCodeRootPath = codeStoreRootPath + File.separator + UUID.randomUUID(); // 构造唯一目录名
 		String userCodePath = userCodeRootPath + File.separator + EXECUTE_CODE_FILE_NAME; // 该目录下创建 Main.java 文件
 		File userCodeFile = FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8); // 将用户代码写入 Main.java 中
-		for (int i = 0; i < inputList.size(); i++) {
-			String inputFilePath = userCodeRootPath + File.separator + INPUT_NAME_PREFIX + i + ".txt";
-			FileUtil.writeString(inputList.get(i).trim(), inputFilePath, StandardCharsets.UTF_8);
+		if (inputList.size() != 0 || inputList != null) {
+			for (int i = 0; i < inputList.size(); i++) {
+				String inputFilePath = userCodeRootPath + File.separator + INPUT_NAME_PREFIX + i + ".txt";
+				FileUtil.writeString(inputList.get(i).trim(), inputFilePath, StandardCharsets.UTF_8);
+			}
 		}
 		/* 返回用户提交的代码文件所在的目录 */
 		return userCodeFile.getParentFile().getAbsolutePath();
@@ -256,14 +265,17 @@ public class LocalCodeSandBox implements CodeSandBox {
 	 */
 	private static List<CodeExecuteResult> codeRun(String codeFileParentDir, List<String> inputList, Long timeLimit, Long memory) {
 		List<CodeExecuteResult> messages = new ArrayList<>();
-
-		ExecutorService executor = Executors.newSingleThreadExecutor();
+		
+		ExecutorService executor = Executors.newFixedThreadPool(4);
 		List<Callable<CodeExecuteResult>> tasks = new ArrayList<>();
-
 		for (int i = 0; i < inputList.size(); i++) {
 			int index = i;
 			tasks.add(() -> {
-				String[] runCommand = ArrayUtil.append(JAVA_RUN_COMMAND, codeFileParentDir, "Main");
+				String[] runCommand = ArrayUtil.append(JAVA_RUN_COMMAND, codeFileParentDir + ":"+ "/home/parallels/codeSandBox/src/main/resources/tmpCode/" ,"-Djava.security.manager=DenyPermission", "Main");
+				for (int j = 0 ; j < runCommand.length ; j ++) {
+					System.out.print(runCommand[j] + " ");
+				}
+				System.out.println();
 				var processBuilder = new ProcessBuilder(runCommand);
 				if (!inputList.get(index).trim().isEmpty()) {
 					processBuilder.redirectInput(new File(codeFileParentDir + File.separator + INPUT_NAME_PREFIX + index + ".txt"));
