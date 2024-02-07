@@ -75,8 +75,4 @@ public class CodeSandBoxApplicationTests {
 		JudgeResponse judgeResponse = dockerCodeSandBox.codeJudge(judgeRequest);
 		System.out.println(judgeResponse);
 	}
-	@Test
-	void testOshi() {
-
-	}
 }

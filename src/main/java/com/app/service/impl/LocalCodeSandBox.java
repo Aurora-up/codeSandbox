@@ -97,7 +97,7 @@ public class LocalCodeSandBox implements CodeSandBox {
 			codeFileClean(codeFileParentDir);
 			String[] permissionException = codeRunResult.getErrorResult().split("#");
 			return respBuilder.resultStatus(1)
-							.resultMessage(permissionException[1])
+							.resultMessage(permissionException[1]) // permissionException[1]
 							.build();
 		}
 	}
@@ -175,8 +175,9 @@ public class LocalCodeSandBox implements CodeSandBox {
 			}
 			/* Permission Deny */
 			else {
+				String[] permissionException = res.getErrorResult().split("#");
 				judgeResponse = JRBuilder.resultStatus(1)
-								.resultMessage("Permission Deny")
+								.resultMessage(permissionException[1])
 								.build();
 				// todo
 				codeFileClean(codeFileParentDir);

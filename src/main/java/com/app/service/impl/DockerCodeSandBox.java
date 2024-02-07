@@ -12,6 +12,7 @@ import com.app.service.CodeSandBox;
 import com.app.utils.ProcessUtil;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
+import com.github.dockerjava.api.command.ListContainersCmd;
 import com.github.dockerjava.api.command.PullImageResultCallback;
 import com.github.dockerjava.api.command.StatsCmd;
 import com.github.dockerjava.api.model.*;
@@ -205,8 +206,9 @@ public class DockerCodeSandBox implements CodeSandBox {
 			}
 			/* Permission Deny */
 			else {
+				String[] permissionException = res.getErrorResult().split("#");
 				judgeResponse = JRBuilder.resultStatus(1)
-						.resultMessage("Permission Deny")
+						.resultMessage(permissionException[1])
 						.build();
 				// todo
 				codeFileClean(codeFileParentDir.toString());
@@ -341,10 +343,11 @@ public class DockerCodeSandBox implements CodeSandBox {
 	 * @return 创建好的容器ID
 	 */
 	private static String getContainerId(DockerClient dockerClient, Path codeFileParentDir) {
-		var listContainersCmd = dockerClient.listContainersCmd().withNameFilter(List.of(JAVA_CONTAINER_NAME));
+		var listContainersCmd = dockerClient.listContainersCmd().withNameFilter(List.of(JAVA_CONTAINER_NAME)).withShowAll(true);
 		var listImageCmd = dockerClient.listImagesCmd().withReferenceFilter(JAVA_DOCKER_IMAGE);
-		List<Container> existedContainer = listContainersCmd.exec();
+
 		List<Image> existedImage = listImageCmd.exec();
+		List<Container> existedContainer = listContainersCmd.exec();
 
 		String containerId;
 		if (existedImage.isEmpty() && existedContainer.isEmpty()) {
@@ -414,7 +417,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 
 				stopWatch.start(); // ----------------------------- 开始统计进程运行时间
 				Process runProcess = processBuilder.start();
-
+				
 				Integer exitValue;
 				var messageBuilder = CodeExecuteResult.builder();
 				var message = new CodeExecuteResult();
