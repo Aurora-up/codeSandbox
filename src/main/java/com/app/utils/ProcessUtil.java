@@ -12,6 +12,46 @@ import java.io.InputStreamReader;
  */
 public class ProcessUtil {
 	/**
+	 * 内存监控线程类
+	 */
+	public static class MemoryMonitor implements Runnable {
+		private Process process;
+		private long peakMemoryUsage;
+
+		public MemoryMonitor(Process process) {
+			this.process = process;
+			this.peakMemoryUsage = 0;
+		}
+
+		@Override
+		public void run() {
+			try {
+				/* 进程一直存活时, 获取执行进程实际使用的物理内存大小 */
+				while (process.isAlive()) {
+					ProcessBuilder psBuilder = new ProcessBuilder("ps", "-p", String.valueOf(process.pid()), "-o", "rss=");
+					Process daemon = psBuilder.start();
+
+					try (InputStream inputStream = daemon.getInputStream()) {
+						String output = getProcessOutput(inputStream, 0);
+						if (output.trim() != "") {
+							long memoryUsage = Long.parseLong(output.trim()) * 1024;
+							peakMemoryUsage = Math.max(peakMemoryUsage, memoryUsage);
+						}
+					}
+
+					daemon.waitFor();
+					Thread.sleep(20); // 每 20ms 监控一次
+				}
+			} catch (IOException | InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+
+		public long getPeakMemoryUsage() {
+			return peakMemoryUsage;
+		}
+	}
+	/**
 	 * 获取 (编译/运行) 进程的 (正常/异常) 输出
 	 * @param in (正常/异常) 输出流
 	 * @param exitValue 进程退出代码
@@ -33,40 +73,5 @@ public class ProcessUtil {
 			e.printStackTrace();
 		}
 		return out.toString();
-	}
-	public static long getMemoryUsage(Process runProcess) {
-		try {
-			long pid = runProcess.toHandle().pid();
-			System.out.println("++++++++++++++" + runProcess.toHandle().pid());
-			long maxMemoryUsage = 0;
-
-			// 循环获取特定进程的内存使用情况
-			while (runProcess.isAlive()) {
-				// 获取特定进程的内存使用情况
-				long memoryUsage = getMemoryUsage(pid);
-				System.out.println("Process Memory Used: " + memoryUsage + "B");
-
-				// 更新最大内存使用值
-				maxMemoryUsage = Math.max(maxMemoryUsage, memoryUsage);
-
-				// 等待一段时间
-				Thread.sleep(200);
-			}
-
-			return maxMemoryUsage;
-		} catch (IOException | InterruptedException e) {
-			e.printStackTrace();
-			return -1; // 返回负值表示出错
-		}
-	}
-
-
-	private static long getMemoryUsage(long pid) throws IOException {
-		String command = "ps -p " + pid + " -o rss=";
-		Process process = new ProcessBuilder("bash", "-c", command).start();
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-			String memoryUsage = reader.readLine();
-			return Long.parseLong(memoryUsage);
-		}
 	}
 }

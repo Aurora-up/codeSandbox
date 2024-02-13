@@ -27,7 +27,7 @@ public class CodeSandBoxApplicationTests {
 	void localCodeSandBoxDebugTest() {
 		var localCodeSandBox = new LocalCodeSandBox();
 		var req = new DebugRequest();
-		req.setInput("2 5\n1 2\n2 4");  // 正确结果: 10;   错误输入测试: "4 5\n1 2\n2 4" "2 5\n1 2\n2 4"
+		req.setInput("3 4\n");  // 正确结果: 8;   4 5\n1 2\n2 4\n3 4\n4 5
 		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		req.setCode(code);
@@ -39,13 +39,14 @@ public class CodeSandBoxApplicationTests {
 	void localCodeSandBoxRunTest() {
 		var localCodeSandBox = new LocalCodeSandBox();
 		var judgeRequest = new JudgeRequest();
-		TestCase testCase0 = new TestCase(0,"2 5\n1 2\n2 4", "10");
-		TestCase testCase1 = new TestCase(1,"4 5\n1 2\n2 4\n3 4\n4 5", "10");
+		TestCase testCase0 = new TestCase(0,"2 5\n1 2\n2 4", "6");
+		TestCase testCase1 = new TestCase(1,"4 5\n1 2\n2 4\n3 4\n4 5", "8");
 		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		judgeRequest.setTestCases(List.of(testCase0, testCase1));
 		judgeRequest.setCode(code);
 		judgeRequest.setTimeLimit(1000L);
+		judgeRequest.setMemoryLimit(64 * 1024 * 1024L);
 		JudgeResponse judgeResponse = localCodeSandBox.codeJudge(judgeRequest);
 		System.out.println(judgeResponse);
 	}
@@ -54,7 +55,7 @@ public class CodeSandBoxApplicationTests {
 	void dockerCodeSandBoxDebugTest() {
 		var dockerCodeSandBox = new DockerCodeSandBox();
 		var req = new DebugRequest();
-		req.setInput("2 5\n1 2\n2 4");  // 正确结果: 10;   错误输入测试: "4 5\n1 2\n2 4"
+		req.setInput("4 5\n1 2\n2 4\n3 4\n4 5");  // 正确结果: 8   错误输入测试: "4 5\n1 2\n2 4"
 		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		req.setCode(code);
@@ -65,13 +66,14 @@ public class CodeSandBoxApplicationTests {
 	void dockerCodeSandBoxRunTest() {
 		var dockerCodeSandBox = new DockerCodeSandBox();
 		var judgeRequest = new JudgeRequest();
-		TestCase testCase0 = new TestCase(0,"2 5\n1 2\n2 4", "10");
-		TestCase testCase1 = new TestCase(1,"4 5\n1 2\n2 4\n3 4\n4 5", "10");
+		TestCase testCase0 = new TestCase(0,"2 5\n1 2\n2 4", "6");
+		TestCase testCase1 = new TestCase(1,"4 5\n1 2\n2 4\n3 4\n4 5", "8");
 		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/Main.java";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
 		judgeRequest.setTestCases(List.of(testCase0, testCase1));
 		judgeRequest.setCode(code);
 		judgeRequest.setTimeLimit(1000L);
+		judgeRequest.setMemoryLimit(64 * 1024 * 1024L);
 		JudgeResponse judgeResponse = dockerCodeSandBox.codeJudge(judgeRequest);
 		System.out.println(judgeResponse);
 	}

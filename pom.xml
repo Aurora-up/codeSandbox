@@ -53,10 +53,11 @@
             <artifactId>docker-java-transport-httpclient5</artifactId>
             <version>3.3.4</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.google.googlejavaformat/google-java-format -->
         <dependency>
-            <groupId>com.github.oshi</groupId>
-            <artifactId>oshi-core</artifactId>
-            <version>3.5.0</version>
+            <groupId>com.github.javaparser</groupId>
+            <artifactId>javaparser-symbol-solver-core</artifactId>
+            <version>3.25.8</version>
         </dependency>
     </dependencies>
 

@@ -10,6 +10,8 @@ import com.app.module.judge.JudgeResponse;
 import com.app.module.judge.TestCase;
 import com.app.service.CodeSandBox;
 import com.app.utils.ProcessUtil;
+import com.github.javaparser.StaticJavaParser;
+
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
@@ -20,6 +22,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Function;
 
 /**
  * @author HDD
@@ -30,10 +33,10 @@ import java.util.concurrent.*;
 public class LocalCodeSandBox implements CodeSandBox {
 	private static final String CODE_STORE_ROOT_PATH = "tempCodeRepository";
 	private static final String EXECUTE_CODE_FILE_NAME = "Main.java";
-	private static final String[] JAVA_COMPILE_COMMAND = new String[]{"javac", "-encoding", "utf-8"};
-	private static final String[] JAVA_RUN_COMMAND = new String[]{"java","-Xmx256m", "-Dfile.encoding=UTF-8","-cp"};
+	private static final String[] JAVA_COMPILE_COMMAND = new String[] { "javac", "-encoding", "utf-8" };
+	private static final String[] JAVA_RUN_COMMAND = new String[] { "java", "-Xmx256m", "-Dfile.encoding=UTF-8", "-cp" };
 	private static final String INPUT_NAME_PREFIX = "input-";
-	private static final Long TIME_LIMIT = 3000L;  // 3s
+	private static final Long TIME_LIMIT = 3000L; // 3s
 	private static final Long Memory_LIMIT = 256 * 1000 * 1000L; // 256MB
 
 	/**
@@ -61,8 +64,8 @@ public class LocalCodeSandBox implements CodeSandBox {
 		if (isMaliciousCode) {
 			codeFileClean(codeFileParentDir);
 			return respBuilder.resultStatus(1)
-							.resultMessage("Include Malicious Code")
-							.build();
+					.resultMessage("Include Malicious Code")
+					.build();
 		}
 		/* 代码编译 */
 		var codeCompileResult = codeCompile(codeFileParentDir);
@@ -70,35 +73,63 @@ public class LocalCodeSandBox implements CodeSandBox {
 		if (codeCompileResult.getExitValue() != 0) {
 			codeFileClean(codeFileParentDir);
 			return respBuilder.resultStatus(2)
-							.resultMessage(codeCompileResult.getErrorResult())
-							.build();
+					.resultMessage(codeCompileResult.getErrorResult())
+					.build();
 		}
 		/* 代码运行 */
 		var codeExecuteResults = codeRun(codeFileParentDir, inputList, TIME_LIMIT, Memory_LIMIT);
 		var codeRunResult = codeExecuteResults.get(0);
-		// AC
+		// 代码正常运行
 		if (codeRunResult.getExitValue() == 0) {
 			codeFileClean(codeFileParentDir);
 			return respBuilder.resultStatus(0)
-							.resultMessage(codeRunResult.getNormalResult())
-							.time(codeRunResult.getTime())
-							.memory(codeRunResult.getMemory())
-							.build();
+					.resultMessage(codeRunResult.getNormalResult() + codeRunResult.getErrorResult())
+					.time(codeRunResult.getTime())
+					.build();
 		}
-		// 运行超时 (Run Timeout)
+		// 运行超时 (Runtime Timeout)
 		else if (codeRunResult.getExitValue() == 4) {
 			codeFileClean(codeFileParentDir);
 			return respBuilder.resultStatus(4)
-							.resultMessage(codeRunResult.getErrorResult())
-							.time(Long.MAX_VALUE)
-							.build();
-		} else {
-			// 权限不足
+					.resultMessage(codeRunResult.getErrorResult())
+					.time(Long.MAX_VALUE)
+					.build();
+		}
+		// 内存溢出 (Runtime Out Of Memory)
+		else if (codeRunResult.getExitValue() == 5) {
 			codeFileClean(codeFileParentDir);
-			String[] permissionException = codeRunResult.getErrorResult().split("#");
-			return respBuilder.resultStatus(1)
-							.resultMessage(permissionException[1]) // permissionException[1]
-							.build();
+			return respBuilder.resultStatus(5)
+					.resultMessage(codeRunResult.getErrorResult())
+					.build();
+		}
+		// 运行时错误——越权操作 (Runtime Error —— Permission Deny)
+		else {
+			codeFileClean(codeFileParentDir);
+			Function<String, Object> isPermissionDenyInfo = (String errorResult) -> {
+				String[] permissionException = errorResult.split("#as#");
+				if (permissionException.length >= 2) {
+					return permissionException[1];
+				}
+				return null;
+			};
+			var permissionMessage = isPermissionDenyInfo.apply(codeRunResult.getErrorResult());
+			/* 越权操作 (Permission Deny) */
+			if (permissionMessage != null) {
+				return respBuilder.resultStatus(3)
+					.resultMessage("Runtime Error: " + permissionMessage.toString())
+					.build();
+			}
+			/* 其他运行时错误 */
+			Function<String, String> tackleRuntimeErrorOutput = (String errorResult) -> {
+				String[] runtimeException = errorResult.split("future release");
+				if (runtimeException.length >= 2) {
+					return runtimeException[1];
+				}
+				return errorResult;				
+			};
+			return respBuilder.resultStatus(3)
+					.resultMessage("Runtime Error: " + tackleRuntimeErrorOutput.apply(codeRunResult.getErrorResult()))
+					.build();
 		}
 	}
 
@@ -120,8 +151,8 @@ public class LocalCodeSandBox implements CodeSandBox {
 		if (isMaliciousCode) {
 			codeFileClean(codeFileParentDir);
 			return JRBuilder.resultStatus(1)
-							.resultMessage("Include Malicious Code")
-							.build();
+					.resultMessage("Include Malicious Code")
+					.build();
 		}
 		/* 代码编译 */
 		var codeCompileResult = codeCompile(codeFileParentDir);
@@ -129,59 +160,71 @@ public class LocalCodeSandBox implements CodeSandBox {
 		if (codeCompileResult.getExitValue() != 0) {
 			codeFileClean(codeFileParentDir);
 			return JRBuilder.resultStatus(2)
-							.resultMessage(codeCompileResult.getErrorResult())
-							.build();
+					.resultMessage(codeCompileResult.getErrorResult())
+					.build();
 		}
-
 		// 构建测试数据的ID 和 其正确结果之间的 HashMap
 		HashMap<Integer, String> mp = new HashMap<>();
 		judgeRequest.getTestCases().forEach(testCase -> mp.put(testCase.getId(), testCase.getCorrectResult()));
 
 		/* 代码运行 */
-		var codeRunResults = codeRun(codeFileParentDir, inputList, judgeRequest.getTimeLimit(), judgeRequest.getMemoryLimit());
+		var codeRunResults = codeRun(codeFileParentDir, inputList, judgeRequest.getTimeLimit(),
+				judgeRequest.getMemoryLimit());
 		var judgeResponse = new JudgeResponse();
 		int passTestCasesNumber = 0;
 		Long time = 0L;
 
 		for (CodeExecuteResult res : codeRunResults) {
-			/* 正常运行 */
+			// 代码正常运行
 			if (res.getExitValue() == 0) {
 				// 当前测试数据通过
 				if (Objects.equals(res.getNormalResult(), mp.get(res.getTestCaseId()))) {
 					passTestCasesNumber++;
 					judgeResponse = JRBuilder.passTestCasesNumber(passTestCasesNumber)
-									.time(Math.max(time, res.getTime()))
-									.build();
+							.time(Math.max(time, res.getTime()))
+							.build();
 				}
-				// 当前测试数据未通过 —— 运行失败 (Runtime Error)
+				// 当前测试数据未通过 —— 答案错误 (Wrong Answer)
 				else {
-					judgeResponse = JRBuilder.resultStatus(3)
-									.passTestCasesNumber(passTestCasesNumber)
-									.resultMessage("Runtime Error")
-									.noPassTestCaseId(res.getTestCaseId())
-									.build();
+					judgeResponse = JRBuilder.resultStatus(6)
+							.passTestCasesNumber(passTestCasesNumber)
+							.resultMessage("Wrong Answer")
+							.noPassTestCaseId(res.getTestCaseId())
+							.build();
+					return judgeResponse;
 				}
 			}
-			/* Runtime Timeout */
+			// 运行超时 (Runtime Timeout)
 			else if (res.getExitValue() == 4) {
 				judgeResponse = JRBuilder.resultStatus(4)
-								.passTestCasesNumber(passTestCasesNumber)
-								.resultMessage("Runtime Timeout")
-								.noPassTestCaseId(res.getTestCaseId())
-								.time(Long.MAX_VALUE)
-								.build();
+						.passTestCasesNumber(passTestCasesNumber)
+						.resultMessage("Runtime Timeout")
+						.noPassTestCaseId(res.getTestCaseId())
+						.time(Long.MAX_VALUE)
+						.build();
 				codeFileClean(codeFileParentDir);
-				return judgeResponse;   // 有一个超时, 直接返回
+				return judgeResponse; // 有一个超时, 直接返回
 			}
-			/* Permission Deny */
+			// 内存溢出 (Runtime Out Of Memory)
+			else if (res.getExitValue() == 5) {
+				judgeResponse = JRBuilder.resultStatus(5)
+						.passTestCasesNumber(passTestCasesNumber)
+						.resultMessage(res.getErrorResult())
+						.noPassTestCaseId(res.getTestCaseId())
+						.memory(Long.MAX_VALUE)
+						.build();
+				return judgeResponse; // 有一个内存溢出, 直接返回
+			}
+			// 运行时错误——越权操作 (Runtime Error —— Permission Deny)
 			else {
-				String[] permissionException = res.getErrorResult().split("#");
-				judgeResponse = JRBuilder.resultStatus(1)
-								.resultMessage(permissionException[1])
-								.build();
-				// todo
 				codeFileClean(codeFileParentDir);
-
+				String[] permissionException = res.getErrorResult().split("#");
+				judgeResponse = JRBuilder.resultStatus(3)
+						.passTestCasesNumber(passTestCasesNumber)
+						.resultMessage("Runtime Error —— " + permissionException[1])
+						.noPassTestCaseId(res.getTestCaseId())
+						.build();
+				return judgeResponse; // 有一个越权, 直接返回
 			}
 		}
 		// AC ——通过测试数据数 == 测试数据数
@@ -240,15 +283,16 @@ public class LocalCodeSandBox implements CodeSandBox {
 	 */
 	private static CodeExecuteResult codeCompile(String codeFileParentDir) {
 		var messageBuild = CodeExecuteResult.builder();
-		String[] compileCommand = ArrayUtil.append(JAVA_COMPILE_COMMAND, codeFileParentDir + File.separator + EXECUTE_CODE_FILE_NAME);
+		String[] compileCommand = ArrayUtil.append(JAVA_COMPILE_COMMAND,
+				codeFileParentDir + File.separator + EXECUTE_CODE_FILE_NAME);
 		var processBuilder = new ProcessBuilder(compileCommand);
 		try {
 			Process compileProcess = processBuilder.start();
 			int exitValue = compileProcess.waitFor();
 			var message = messageBuild.exitValue(exitValue)
-							.normalResult(ProcessUtil.getProcessOutput(compileProcess.getInputStream(), exitValue))
-							.errorResult(ProcessUtil.getProcessOutput(compileProcess.getErrorStream(), exitValue))
-							.build();
+					.normalResult(ProcessUtil.getProcessOutput(compileProcess.getInputStream(), exitValue))
+					.errorResult(ProcessUtil.getProcessOutput(compileProcess.getErrorStream(), exitValue))
+					.build();
 			compileProcess.destroy();
 			return message;
 		} catch (IOException | InterruptedException e) {
@@ -264,23 +308,27 @@ public class LocalCodeSandBox implements CodeSandBox {
 	 * @param inputList         用户输入
 	 * @return List<CodeExecuteResult> 运行结果信息
 	 */
-	private static List<CodeExecuteResult> codeRun(String codeFileParentDir, List<String> inputList, Long timeLimit, Long memory) {
+	private static List<CodeExecuteResult> codeRun(String codeFileParentDir, List<String> inputList, Long timeLimit,
+			Long memory) {
 		List<CodeExecuteResult> messages = new ArrayList<>();
 		String permissionCheckFilePath = System.getProperty("user.dir") + File.separator + "tempCodeRepository";
 		if (!Files.exists(Paths.get(permissionCheckFilePath + File.separator + "DenySecurity.class"))) {
 			compileDenyPermissionFile();
 		}
-		
+
 		ExecutorService executor = Executors.newFixedThreadPool(4);
 		List<Callable<CodeExecuteResult>> tasks = new ArrayList<>();
 		for (int i = 0; i < inputList.size(); i++) {
 			int index = i;
 			tasks.add(() -> {
-				String[] runCommand = ArrayUtil.append(JAVA_RUN_COMMAND, codeFileParentDir + ":"+ permissionCheckFilePath ,"-Djava.security.manager=DenyPermission", "Main");
+				String[] runCommand = ArrayUtil.append(JAVA_RUN_COMMAND, codeFileParentDir + ":" + permissionCheckFilePath,
+						"-Djava.security.manager=DenyPermission", "Main");
 				var processBuilder = new ProcessBuilder(runCommand);
 				if (!inputList.get(index).trim().isEmpty()) {
-					processBuilder.redirectInput(new File(codeFileParentDir + File.separator + INPUT_NAME_PREFIX + index + ".txt"));
+					processBuilder
+							.redirectInput(new File(codeFileParentDir + File.separator + INPUT_NAME_PREFIX + index + ".txt"));
 				}
+
 				var stopWatch = new StopWatch();
 
 				stopWatch.start(); // ----------------------------- 开始统计进程运行时间
@@ -294,20 +342,30 @@ public class LocalCodeSandBox implements CodeSandBox {
 					exitValue = runProcess.exitValue();
 					stopWatch.stop(); // ----------------------------- 结束统计进程运行时间
 
+					String errorMessage = ProcessUtil.getProcessOutput(runProcess.getErrorStream(), exitValue);
+					// Runtime Out Of Memory
+					if (errorMessage.contains("java.lang.OutOfMemoryError")) {
+						exitValue = 5;
+						errorMessage = errorMessage.split("release")[1];
+					}
+
 					message = messageBuilder.exitValue(exitValue)
-									.testCaseId(index)
-									.time(stopWatch.getLastTaskTimeMillis())
-									.normalResult(ProcessUtil.getProcessOutput(runProcess.getInputStream(), exitValue))
-									.errorResult(ProcessUtil.getProcessOutput(runProcess.getErrorStream(), exitValue))
-									.build();
+							.testCaseId(index)
+							.memory(0L)
+							.time(stopWatch.getLastTaskTimeMillis())
+							.normalResult(ProcessUtil.getProcessOutput(runProcess.getInputStream(), exitValue))
+							.errorResult(errorMessage)
+							.build();
+
 				} else {
 					stopWatch.stop(); // ----------------------------- 结束统计进程运行时间
-					exitValue = 4;    // Run Timeout
+					exitValue = 4; // Runtime Timeout
 					message = messageBuilder.exitValue(exitValue)
-									.testCaseId(index)
-									.time(stopWatch.getLastTaskTimeMillis())
-									.errorResult("Runtime Timeout")
-									.build();
+							.testCaseId(index)
+							.memory(0L)
+							.time(stopWatch.getLastTaskTimeMillis())
+							.errorResult("Runtime Timeout")
+							.build();
 					runProcess.destroy();
 				}
 				return message;
@@ -333,15 +391,17 @@ public class LocalCodeSandBox implements CodeSandBox {
 		}
 		return messages;
 	}
+
 	/**
 	 * 编译权限校验文件
+	 * 
 	 * @return 编译后的 .class 文件所在目录
 	 */
 	private static String compileDenyPermissionFile() {
 		String userDir = System.getProperty("user.dir");
 		String classPath = userDir + File.separator + "tempCodeRepository";
-		String javaPath = userDir + File.separator +"src/main/resources/permission/DenyPermission.java";
-		var processBuilder = new ProcessBuilder(new String[]{"javac", "-d",classPath , javaPath});
+		String javaPath = userDir + File.separator + "src/main/resources/permission/DenyPermission.java";
+		var processBuilder = new ProcessBuilder(new String[] { "javac", "-d", classPath, javaPath });
 		try {
 			Process compilePermissionCheckFile = processBuilder.start();
 			compilePermissionCheckFile.waitFor();
@@ -360,19 +420,19 @@ public class LocalCodeSandBox implements CodeSandBox {
 		try {
 			Path directoryToDelete = Paths.get(codeFileParentDir);
 			Files.walkFileTree(directoryToDelete, EnumSet.noneOf(FileVisitOption.class), Integer.MAX_VALUE,
-							new SimpleFileVisitor<>() {
-								@Override
-								public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-									Files.delete(file);
-									return FileVisitResult.CONTINUE;
-								}
+					new SimpleFileVisitor<>() {
+						@Override
+						public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+							Files.delete(file);
+							return FileVisitResult.CONTINUE;
+						}
 
-								@Override
-								public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-									Files.delete(dir);
-									return FileVisitResult.CONTINUE;
-								}
-							});
+						@Override
+						public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+							Files.delete(dir);
+							return FileVisitResult.CONTINUE;
+						}
+					});
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
