@@ -84,11 +84,27 @@ public class CodeSandBoxApplicationTests {
 		var rustCodeSandBox = new RustCodeSandBox();
 		var req = new DebugRequest();
 		req.setInput("4 5");  // 正确结果: 8   错误输入测试: "4 5\n1 2\n2 4"
-		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/main.c";
+		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/main.rs";
 		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
-		req.setLang("c");
+		req.setLang("rust");
 		req.setCode(code);
 		DebugResponse debugResponse = rustCodeSandBox.codeDebug(req);
 		System.out.println(debugResponse);
+	}
+	@Test
+	void rustCodeSandBoxRunTest() {
+		var rustCodeSandBox = new RustCodeSandBox();
+		var req = new JudgeRequest();
+		TestCase testCase1 = new TestCase(1,"2 5", "7");
+		TestCase testCase2 = new TestCase(2,"4 5", "9");
+		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/main.cpp";
+		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
+		req.setLang("cpp");
+		req.setCode(code);
+		req.setTestCases(List.of(testCase1, testCase2));
+		req.setTimeLimit(1000L);
+		req.setMemoryLimit(64 * 1024 * 1024L);
+		var judgeResponse = rustCodeSandBox.codeJudge(req);
+		System.out.println(judgeResponse);
 	}
 }

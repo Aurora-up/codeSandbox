@@ -38,10 +38,9 @@ pub mod entity {
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct Response {
         /**
-         * 1: 越权操作 (Permission Deny)
          * 500: rust 运行脚本异常
          * 1000: 正常执行
-         * 1002: 运行时错误 (Runtime Error. RE)
+         * 1002: 运行时错误 (Runtime Error. RE) 包括越权操作造成的运行时异常
          * 1003: 运行超时  (Time Limit Exceeded. TLE)
          * 1004: 运行内存超出限制 (Memory Limit Exceeded. MLE)
          */

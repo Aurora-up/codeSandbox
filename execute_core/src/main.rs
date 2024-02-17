@@ -80,7 +80,8 @@ async fn child_process(
     /* 匹配编程语言对应执行命令 */
     let mut run_command: Command;
     let mut command_args: Option<&[&str]> = None;
-    let java_args = ["-cp", file_dir.as_str(), "Main"];
+    let permission_path = format!("{}:{}", file_dir, "/codeStore");
+    let java_args = ["-Dfile.encoding=UTF-8", "-cp", permission_path.as_str(),"-Djava.security.manager=DenyPermission" ,"Main"];
 
     match lang {
         1 => {
@@ -144,7 +145,7 @@ async fn child_process(
                     if let Some(mut stdout) = run_process.stdout.take() {
                         response.set_exit_code(1000);
                         stdout.read_to_string(&mut normal_output).await.unwrap();
-                        response.set_output_msg(general_purpose::STANDARD.encode(normal_output));
+                        response.set_output_msg(general_purpose::STANDARD.encode(normal_output.trim_end_matches('\n')));
                     }
                 }
                 /* 异常输出 */

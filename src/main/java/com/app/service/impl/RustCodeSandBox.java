@@ -3,7 +3,6 @@ package com.app.service.impl;
 import cn.hutool.core.codec.Base64;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ArrayUtil;
-import cn.hutool.crypto.asymmetric.RSA;
 import cn.hutool.json.JSONUtil;
 
 import com.app.module.CodeExecuteResult;
@@ -11,7 +10,6 @@ import com.app.module.debug.DebugRequest;
 import com.app.module.debug.DebugResponse;
 import com.app.module.execute.RequestArgs;
 import com.app.module.execute.Response;
-import com.app.module.execute.Response.ResponseBuilder;
 import com.app.module.judge.JudgeRequest;
 import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
@@ -35,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -45,6 +44,7 @@ import java.util.regex.Pattern;
  */
 @Component
 @Slf4j
+@SuppressWarnings("deprecation")
 public class RustCodeSandBox implements CodeSandBox {
 	/* Docker 沙箱信息 */
 	private static final String ENVIRONMENT_DOCKER_IMAGE = "rust:slim";
@@ -60,6 +60,7 @@ public class RustCodeSandBox implements CodeSandBox {
 	private static final String[] C_COMPILE_COMMAND = new String[] {"gcc"};
 	private static final String JAVA_CODE_FILE_NAME = "Main.java";
 	private static final String[] JAVA_COMPILE_COMMAND = new String[] {"javac", "-encoding", "utf-8"};
+	private static final String PYTHON_CODE_FILE_NAME = "main.py";
 	/* 测试数据文件前缀 */
 	private static final String INPUT_NAME_PREFIX = "input-";
 	/* 代码调试限制 (相对宽松)  */ 
@@ -90,16 +91,35 @@ public class RustCodeSandBox implements CodeSandBox {
 		var codeCompileResult = codeCompile(codeFileParentDir.toString(), lang);
 		// 编译失败 (Compiler Error)
 		if (codeCompileResult.getExitValue() != 0) {
-			/* java 代码编译错误输出过滤 */
-			Function<String, String> tackleOutput = (String errorResult) -> {
-				String[] compileError = errorResult.split("Main.java");
+			/* 代码编译错误输出过滤 */
+			BiFunction<String, String, String> tackleOutput = (String errorResult, String langType) -> {
+				String perfix = new String("main");
+				String subfix = new String();
+				switch (langType) {
+					case "java":
+						perfix = "Main";
+						subfix = ".java";
+						break;
+					case "cpp":
+						subfix = ".cpp";
+						break;
+					case "c":
+						subfix = ".c";
+						break;
+					case "rust":
+						subfix = ".rs";
+						break;
+					default:
+						break;
+				}
+				String[] compileError = errorResult.split(perfix + subfix);
 				if (compileError.length >= 2) {
-					return "Main.java: " + compileError[1];
+					return perfix + subfix + compileError[1];
 				}
 				return errorResult;
 			};
 			return respBuilder.resultStatus(1001)
-					.resultMessage(tackleOutput.apply(codeCompileResult.getErrorResult()))
+					.resultMessage(Base64.encode(tackleOutput.apply(codeCompileResult.getErrorResult(), lang)))
 					.build();
 		}
 		/* 初始化 Docker 客户端 */
@@ -117,11 +137,11 @@ public class RustCodeSandBox implements CodeSandBox {
 		}
 
 		/* 代码运行 */
-		var codeExecuteResults = RustCodeSandBox.codeRun(dockerClient, containerId, codeFileParentDir);
+		var codeRunResults = RustCodeSandBox.codeRun(dockerClient, containerId, codeFileParentDir);
 		var debugResponse = new DebugResponse();
 		Response codeRunResult = new Response();
 		try {
-			codeRunResult = codeExecuteResults.get(0);
+			codeRunResult = codeRunResults.get(0);
 		} catch (IndexOutOfBoundsException e) {
 			log.error("代码运行结果返回为空, 导致在 codeDebug 中出现结果数组访问越界异常. ", e);
 		}
@@ -226,16 +246,35 @@ public class RustCodeSandBox implements CodeSandBox {
 		var codeCompileResult = codeCompile(codeFileParentDir.toString(), lang);
 		// 编译失败 (Compiler Error)
 		if (codeCompileResult.getExitValue() != 0) {
-			/* java 代码编译错误输出过滤 */
-			Function<String, String> tackleOutput = (String errorResult) -> {
-				String[] compileError = errorResult.split("Main.java");
+			/* 代码编译错误输出过滤 */
+			BiFunction<String, String, String> tackleOutput = (String errorResult, String langType) -> {
+				String perfix = new String("main");
+				String subfix = new String();
+				switch (langType) {
+					case "java":
+						perfix = "Main";
+						subfix = ".java";
+						break;
+					case "cpp":
+						subfix = ".cpp";
+						break;
+					case "c":
+						subfix = ".c";
+						break;
+					case "rust":
+						subfix = ".rs";
+						break;
+					default:
+						break;
+				}
+				String[] compileError = errorResult.split(perfix + subfix);
 				if (compileError.length >= 2) {
-					return "Main.java: " + compileError[1];
+					return perfix + subfix + compileError[1];
 				}
 				return errorResult;
 			};
 			return JRBuilder.resultStatus(1001)
-					.resultMessage(tackleOutput.apply(codeCompileResult.getErrorResult()))
+					.resultMessage(Base64.encode(tackleOutput.apply(codeCompileResult.getErrorResult(), lang)))
 					.build();
 		}
 
@@ -258,8 +297,14 @@ public class RustCodeSandBox implements CodeSandBox {
 		/* 代码运行 */
 		var codeRunResults = RustCodeSandBox.codeRun(dockerClient, containerId, codeFileParentDir);
 		var judgeResponse = new JudgeResponse();
+		var codeRunResultFirst = new Response();
+		try {
+			codeRunResultFirst = codeRunResults.get(0);
+		} catch (IndexOutOfBoundsException e) {
+			log.error("代码运行结果返回为空, 导致在 codeRun 中出现结果数组访问越界异常. ", e);
+		}
 		/* 判题系统出错 */
-		if (codeRunResults.get(0).getExit_code() == 500) {
+		if (codeRunResultFirst.getExit_code() == 500) {
 			judgeResponse = JRBuilder.resultStatus(500)
 															.resultMessage(Base64.encode("Judge System Error"))
 															.build();
@@ -278,9 +323,9 @@ public class RustCodeSandBox implements CodeSandBox {
 					// 定义匹配由空格、换行符或制表符隔开的内容的正则表达式
 					String regex = "\\s+";
 					Pattern pattern = Pattern.compile(regex);
-					String[] fixOutputMsg = pattern.split(output_msg);
+					String[] fixOutputMsg = pattern.split(Base64.decodeStr(output_msg));
 					// 当前数据通过
-					if (output_msg.equals(mp.get(test_case_id))) {
+					if (Base64.decodeStr(output_msg).equals(mp.get(test_case_id))) {
 						passTestCasesNumber ++;
 						time += response.getTime();  // 时间累加
 						memory = Math.max(memory, response.getMemory()); // 内存使用峰值内存
@@ -288,6 +333,8 @@ public class RustCodeSandBox implements CodeSandBox {
 					// PE
 					else if (ArrayUtil.equals(fixOutputMsg, pattern.split(mp.get(test_case_id)))) {
 						judgeResponse = JRBuilder.resultStatus(1006)
+																		.passTestCasesNumber(passTestCasesNumber)
+																		.noPassTestCaseId(response.getTest_case_id())
 																		.time(response.getTime())
 																		.memory(response.getMemory())
 																		.resultMessage(Base64.encode("Presentation Error"))
@@ -297,6 +344,8 @@ public class RustCodeSandBox implements CodeSandBox {
 					// WA
 					else {
 						judgeResponse = JRBuilder.resultStatus(1005)
+																		.passTestCasesNumber(passTestCasesNumber)
+																		.noPassTestCaseId(response.getTest_case_id())
 																		.time(response.getTime())
 																		.memory(response.getMemory())
 																		.resultMessage(Base64.encode("Presentation Error"))
@@ -312,17 +361,21 @@ public class RustCodeSandBox implements CodeSandBox {
 						if (runtimeException.length >= 2) {
 							return runtimeException[1];
 						}
-						return errorResult;				
+						return errorResult;	
 					};
 					String fixOutput = tackleRuntimeErrorOutput.apply(Base64.decodeStr(output_msg));
 					judgeResponse = JRBuilder.resultStatus(1002)
+																	.passTestCasesNumber(passTestCasesNumber)
+																	.noPassTestCaseId(response.getTest_case_id())
 																	.resultMessage(Base64.encode(fixOutput))
 																	.build();
-					break;	
+					break;
 				}
 				/* 运行超时 */
 				else if (exit_code == 1003) {
 					judgeResponse = JRBuilder.resultStatus(1003)
+																	.passTestCasesNumber(passTestCasesNumber)
+																	.noPassTestCaseId(response.getTest_case_id())
 																	.time(-1L)
 																	.memory(response.getMemory())
 																	.resultMessage(Base64.encode("Time Limit Exceeded"))
@@ -332,6 +385,8 @@ public class RustCodeSandBox implements CodeSandBox {
 				/* 运行时占用内存超出限制 */
 				else if (exit_code == 1004) {
 					judgeResponse = JRBuilder.resultStatus(1004)
+																	.passTestCasesNumber(passTestCasesNumber)
+																	.noPassTestCaseId(response.getTest_case_id())
 																	.time(response.getTime())
 																	.memory(-1L)
 																	.resultMessage(Base64.encode("Memory Limit Exceeded"))
@@ -352,6 +407,8 @@ public class RustCodeSandBox implements CodeSandBox {
 					};
 					var permissionMessage = isPermissionDenyInfo.apply(Base64.decodeStr(permissionDenyInfo));
 					judgeResponse = JRBuilder.resultStatus(1)
+																	.passTestCasesNumber(passTestCasesNumber)
+																	.noPassTestCaseId(response.getTest_case_id())
 																	.time(response.getTime())
 																	.memory(response.getMemory())
 																	.resultMessage(Base64.encode("Permission Deny: " + permissionMessage))
@@ -361,6 +418,8 @@ public class RustCodeSandBox implements CodeSandBox {
 				/* 未知错误 */
 				else {
 					judgeResponse = JRBuilder.resultStatus(777)
+																	.passTestCasesNumber(passTestCasesNumber)
+																	.noPassTestCaseId(response.getTest_case_id())
 																	.resultMessage(Base64.encode("Unknown Error: ") + output_msg)
 																	.time(response.getTime())
 																	.memory(response.getMemory())
@@ -368,8 +427,17 @@ public class RustCodeSandBox implements CodeSandBox {
 					break;
 				}
 			}
+			/* AC */
+			if (passTestCasesNumber == codeRunResults.size()) {
+				judgeResponse = JRBuilder.resultStatus(777)
+													.passTestCasesNumber(passTestCasesNumber)
+													.noPassTestCaseId(0)
+													.resultMessage(Base64.encode("Accepted"))
+													.time(time)
+													.memory(memory)
+													.build();
+			}
 		}
-		
 		return judgeResponse;
 	}
 
@@ -406,6 +474,9 @@ public class RustCodeSandBox implements CodeSandBox {
 				break;
 			case "rust":
 				CODE_FILE_NAME = RUST_CODE_FILE_NAME;
+				break;
+			case "python":
+				CODE_FILE_NAME = PYTHON_CODE_FILE_NAME;
 				break;
 			default:
 				break;
@@ -477,7 +548,7 @@ public class RustCodeSandBox implements CodeSandBox {
 					RUST_COMPILE_COMMAND, 
 					"-o", 
 					codeFileParentDir + File.separator + "main",
-					codeFileParentDir + File.separator + C_CODE_FILE_NAME);
+					codeFileParentDir + File.separator + RUST_CODE_FILE_NAME);
 				break;
 			default:
 				break;
@@ -555,8 +626,9 @@ public class RustCodeSandBox implements CodeSandBox {
 			e.printStackTrace();
 		}
 		hostConfig.withSecurityOpts(List.of("seccomp=" + seccompProfile));
-
+		
 		var containerInstance = containerCmd
+				.withReadonlyRootfs(true)
 				.withHostConfig(hostConfig)
 				.withNetworkDisabled(true)
 				.withAttachStdin(true)
