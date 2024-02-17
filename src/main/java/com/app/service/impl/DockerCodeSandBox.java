@@ -22,6 +22,7 @@ import com.github.dockerjava.transport.DockerHttpClient;
 import lombok.var;
 import lombok.extern.slf4j.Slf4j;
 
+import org.bouncycastle.jcajce.provider.asymmetric.dsa.DSASigner.stdDSA;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
@@ -60,7 +61,6 @@ public class DockerCodeSandBox implements CodeSandBox {
 	 * @param debugRequest 代码调试请求
 	 * @return 代码调试结果 
 	 */
-	@SuppressWarnings("null")
 	@Override
 	public DebugResponse codeDebug(DebugRequest debugRequest) {
 		var respBuilder = DebugResponse.builder();
@@ -180,7 +180,6 @@ public class DockerCodeSandBox implements CodeSandBox {
 	 * @param judgeRequest 代码评审请求
 	 * @return 代码评审结果
 	 */
-	@SuppressWarnings("null")
 	@Override
 	public JudgeResponse codeJudge(JudgeRequest judgeRequest) {
 		var JRBuilder = JudgeResponse.builder();
@@ -343,7 +342,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 			FileUtil.mkdir(codeStoreRootPath);
 		}
 
-		/* 隔离用户提交的代码文件 */
+		/* 隔离用户提交的代码文件和测试数据 */
 		String userCodeRootPath = codeStoreRootPath + File.separator + UUID.randomUUID();
 		String userCodePath = userCodeRootPath + File.separator + EXECUTE_CODE_FILE_NAME;
 		File userCodeFile = FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
@@ -418,6 +417,18 @@ public class DockerCodeSandBox implements CodeSandBox {
 		hostConfig.setBinds(new Bind(codeFileParentDir.getParent().toString(), new Volume("/codeStore")));
 		hostConfig.withMemory(384 * 1024 * 1024L);
 		hostConfig.withCpuCount(1L);
+		
+		String seccompProfile = null;
+		try {
+			String projectDir = System.getProperty("user.dir");
+			String seccompProfilePath = projectDir + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "permission" + File.separator + "seccomp_profile_for_container.json";
+			seccompProfile = new String(Files.readAllBytes(Paths.get(seccompProfilePath)));
+		} catch (IOException e) {
+			log.error("无法读取到 seccomp 配置文件", e);
+			e.printStackTrace();
+		}
+		hostConfig.withSecurityOpts(List.of("seccomp=" + seccompProfile));
+
 		var containerInstance = containerCmd
 				.withHostConfig(hostConfig)
 				.withNetworkDisabled(true)
@@ -492,6 +503,10 @@ public class DockerCodeSandBox implements CodeSandBox {
 								":" + "/codeStore",
 						"-Djava.security.manager=DenyPermission", "Main" };
 
+				// String[] runCommand = new String[] { "docker", "exec", "-i", containerId,
+				// 		"java", "-Xmx" + memoryLimitMB + "m", "-cp",
+				// 		"/codeStore" + File.separator + codeFileParentDir.getFileName().toString(), "Main" };
+
 				var processBuilder = new ProcessBuilder(runCommand);
 				if (!inputList.get(index).trim().isEmpty()) {
 					processBuilder
@@ -521,6 +536,10 @@ public class DockerCodeSandBox implements CodeSandBox {
 					if (errorMessage.contains("java.lang.OutOfMemoryError")) {
 						exitValue = 5;
 						errorMessage = errorMessage.split("release")[1];
+					}
+					if (memoryMonitor.getPeakMemoryUsage() > memoryLimit) {
+						exitValue = 5;
+						errorMessage = "Runtime Out Of Memory";
 					}
 
 					message = messageBuilder.exitValue(exitValue)

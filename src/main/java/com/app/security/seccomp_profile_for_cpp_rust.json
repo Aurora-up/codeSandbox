@@ -1,0 +1,20 @@
+{
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "syscalls": [
+    {
+      "names": [
+        "write",
+        "rename",
+
+        "fork",
+        "exec",
+        "kill",
+        "ptrace",
+        "mmap",
+        "mprotect"
+      ],
+      "action": "SCMP_ACT_ERRNO"
+    }
+
+  ]
+}

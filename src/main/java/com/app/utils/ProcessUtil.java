@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-
 /**
  * @author HDD
  * @date 2024年02月04日
@@ -42,7 +41,7 @@ public class ProcessUtil {
 					daemon.waitFor();
 					Thread.sleep(20); // 每 20ms 监控一次
 				}
-			} catch (IOException | InterruptedException e) {
+			} catch (IOException |InterruptedException e) {
 				e.printStackTrace();
 			}
 		}

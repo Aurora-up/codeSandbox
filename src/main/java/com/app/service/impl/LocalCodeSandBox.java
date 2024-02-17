@@ -10,7 +10,6 @@ import com.app.module.judge.JudgeResponse;
 import com.app.module.judge.TestCase;
 import com.app.service.CodeSandBox;
 import com.app.utils.ProcessUtil;
-import com.github.javaparser.StaticJavaParser;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;

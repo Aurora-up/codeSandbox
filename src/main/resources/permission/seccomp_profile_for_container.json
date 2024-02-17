@@ -1,0 +1,20 @@
+{
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "syscalls": [
+    {
+      "names": [
+        "unlink",
+        "unlinkat",
+        "rename",
+        "renameat",
+        "rmdir",
+        "remove_directory",
+
+        "shutdown",
+        "reboot",
+        "poweroff"
+      ],
+      "action": "SCMP_ACT_ERRNO"
+    }
+  ]
+}

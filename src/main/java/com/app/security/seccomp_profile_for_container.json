@@ -1,0 +1,27 @@
+{
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "syscalls": [
+    {
+      "names": [
+        "unlink", 
+        "rmdir",
+
+        "socket",
+        "bind",
+        "accept",
+        "connect",
+        "listen",
+
+        "shutdown",
+        "reboot",
+        "poweroff",
+
+        "chmod",
+        "chown",
+        "setuid",
+        "setgid"
+      ],
+      "action": "SCMP_ACT_ERRNO"
+    }
+  ]
+}

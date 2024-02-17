@@ -8,6 +8,8 @@ import com.app.module.judge.JudgeResponse;
 import com.app.module.judge.TestCase;
 import com.app.service.impl.DockerCodeSandBox;
 import com.app.service.impl.LocalCodeSandBox;
+import com.app.service.impl.RustCodeSandBox;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -76,5 +78,17 @@ public class CodeSandBoxApplicationTests {
 		judgeRequest.setMemoryLimit(64 * 1024 * 1024L);
 		JudgeResponse judgeResponse = dockerCodeSandBox.codeJudge(judgeRequest);
 		System.out.println(judgeResponse);
+	}
+	@Test
+	void rustCodeSandBoxDebugTest() {
+		var rustCodeSandBox = new RustCodeSandBox();
+		var req = new DebugRequest();
+		req.setInput("4 5");  // 正确结果: 8   错误输入测试: "4 5\n1 2\n2 4"
+		String testFilePath = "/home/parallels/codeSandBox/src/main/resources/testCode/main.c";
+		String code = FileUtil.readString(testFilePath ,StandardCharsets.UTF_8);
+		req.setLang("c");
+		req.setCode(code);
+		DebugResponse debugResponse = rustCodeSandBox.codeDebug(req);
+		System.out.println(debugResponse);
 	}
 }

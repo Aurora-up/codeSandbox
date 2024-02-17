@@ -1,11 +1,13 @@
-@SuppressWarnings({"removal"})
-public class DenyPermission extends SecurityManager{
+@SuppressWarnings({ "removal" })
+public class DenyPermission extends SecurityManager {
+
   /**
    * 禁止去执行 Shell 脚本
    */
   public void checkExec(String filePath) {
     String[] fileName = filePath.split("/");
-    throw new SecurityException("#Permission Deny;" + " Execute Command " + fileName[fileName.length-1] + " is disable!!!#");
+    throw new SecurityException(
+        "#as#" + " Execute Command " + fileName[fileName.length - 1] + " is disable!!!#as#");
   }
 
   /**
@@ -16,7 +18,7 @@ public class DenyPermission extends SecurityManager{
     if (fileName[fileName.length - 1].contains("Main"))
       return;
     else {
-      throw new SecurityException("#Permission Deny;" + " Read " + fileName[fileName.length - 1] + " is disable!!!#");
+      throw new SecurityException("#as#" + " Read " + fileName[fileName.length - 1] + " is disable!!!#as#");
     }
   }
 
@@ -25,7 +27,7 @@ public class DenyPermission extends SecurityManager{
    */
   public void checkWrite(String filePath) {
     String[] fileName = filePath.split("/");
-    throw new SecurityException("#Permission Deny;" + " Write " + fileName[fileName.length-1] + " is disable!!!#");
+    throw new SecurityException("#as#" + " Write " + fileName[fileName.length - 1] + " is disable!!!#as#");
   }
 
   /**
@@ -34,6 +36,6 @@ public class DenyPermission extends SecurityManager{
   @Override
   public void checkDelete(String filePath) {
     String[] fileName = filePath.split("/");
-    throw new SecurityException("#Permission Deny;" + " Delete " + fileName[fileName.length-1] + " is disable!!!#");
+    throw new SecurityException("#as#" + " Delete " + fileName[fileName.length - 1] + " is disable!!!#as#");
   }
 }

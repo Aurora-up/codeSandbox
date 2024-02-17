@@ -8,7 +8,7 @@ import java.io.IOException;
  */
 public class Main {
   public static void main(String[] args) {
-    String filePath = "/home/parallels/codeSandBox/unsafe/delete_exception/testDelete.txt";
+    String filePath = "/codeStore/testDelete.txt";
     Path path = Paths.get(filePath);
     try {
       Files.delete(path);
