@@ -1,25 +1,25 @@
-// #include<bits/stdc++.h>
-// using namespace std;
+#include<iostream>
+#include<algorithm>
 
-// int main(){
-//   int a, b;
-//   cin >> a >> b;
-//   cout << a + b;
-//   return 0;
-// }
-#include <iostream>
-#include <fstream>
+using namespace std;
+const int N = 1010;
 
-int main() {
-    std::ofstream file("test.txt");
+int n,m;
+int v[N],w[N];
+int f[N];
 
-    if (file.is_open()) {
-        file << "Hello, this is a test file." << std::endl;
-        file.close();
-        std::cout << "File 'test.txt' has been written successfully." << std::endl;
-    } else {
-        std::cerr << "Unable to open file 'test.txt' for writing." << std::endl;
-    }
+int main(){
+    cin >> n >> m;
+    
+    for(int i = 1 ; i <= n ; i++ ) cin >> v[i] >> w[i];
+    
+    // 一维
+    for(int i = 1 ; i <= n ; i++)
+        for(int j = v[i] ; j <= m ; j++)
+            f[j] = max(f[j],f[j - v[i]] + w[i]);
 
+                
+    
+    cout << f[m] << endl;
     return 0;
 }

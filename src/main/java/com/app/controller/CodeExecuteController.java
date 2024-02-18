@@ -12,6 +12,7 @@ import com.app.module.judge.JudgeRequest;
 import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
 import com.app.service.impl.DockerCodeSandBox;
+import com.app.service.impl.RustCodeSandBox;
 
 import reactor.core.publisher.Mono;
 
@@ -26,8 +27,8 @@ public class CodeExecuteController {
   public final CodeSandBox codeSandBox;
 
   @Autowired
-  public CodeExecuteController(DockerCodeSandBox dockerCodeSandBox) {
-    this.codeSandBox = dockerCodeSandBox;
+  public CodeExecuteController(RustCodeSandBox rustCodeSandBox) {
+    this.codeSandBox = rustCodeSandBox;
   }
 
   @PostMapping("/debug")

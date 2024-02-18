@@ -80,8 +80,9 @@ async fn child_process(
     /* 匹配编程语言对应执行命令 */
     let mut run_command: Command;
     let mut command_args: Option<&[&str]> = None;
-    let permission_path = format!("{}:{}", file_dir, "/codeStore");
-    let java_args = ["-Dfile.encoding=UTF-8", "-cp", permission_path.as_str(),"-Djava.security.manager=DenyPermission" ,"Main"];
+    // let permission_path = format!("{}:{}", file_dir, "/codeStore");
+    // let java_args = ["-Dfile.encoding=UTF-8", "-cp", permission_path.as_str(),"-Djava.security.manager=DenyPermission" ,"Main"];
+    let java_args = ["-cp", file_dir.as_str() ,"Main"];
 
     match lang {
         1 => {

@@ -47,8 +47,8 @@ import java.util.regex.Pattern;
 @SuppressWarnings("deprecation")
 public class RustCodeSandBox implements CodeSandBox {
 	/* Docker 沙箱信息 */
-	private static final String ENVIRONMENT_DOCKER_IMAGE = "rust:slim";
-	private static final String ENVIRONMENT_CONTAINER_NAME = "rust_environment";
+	private static final String ENVIRONMENT_DOCKER_IMAGE = "sandbox:latest";
+	private static final String ENVIRONMENT_CONTAINER_NAME = "sandbox";
 	private static final String CODE_STORE_ROOT_PATH = "tempCodeRepository";
 	private static final String VOLUMN_CODE_STORE_ROOT_PATH = "/codeStore";
 	/* 各语言编译命令前缀和代码存储目标文件 */
@@ -234,12 +234,12 @@ public class RustCodeSandBox implements CodeSandBox {
 	@Override
 	public JudgeResponse codeJudge(JudgeRequest judgeRequest) {
 		var JRBuilder = JudgeResponse.builder();
-		String code = judgeRequest.getCode();
+		String code = Base64.decodeStr(judgeRequest.getCode()); // ---------------------
 		String lang = judgeRequest.getLang();
 		Long timeLimit = judgeRequest.getTimeLimit();
 		Long memoryLimit = judgeRequest.getMemoryLimit();
 		List<String> inputList = judgeRequest.getTestCases().stream().map(e -> {
-			return e.getInput();
+			return Base64.decodeStr(e.getInput()); // --------------------
 		}).toList();
 		Path codeFileParentDir = tackleCodeStorageAndIsolation(code, inputList, lang, timeLimit, memoryLimit);
 		/* 代码编译 */
@@ -348,7 +348,7 @@ public class RustCodeSandBox implements CodeSandBox {
 																		.noPassTestCaseId(response.getTest_case_id())
 																		.time(response.getTime())
 																		.memory(response.getMemory())
-																		.resultMessage(Base64.encode("Presentation Error"))
+																		.resultMessage(Base64.encode("Wrong Answer"))
 																		.build();
 						break;		
 					}
@@ -429,7 +429,7 @@ public class RustCodeSandBox implements CodeSandBox {
 			}
 			/* AC */
 			if (passTestCasesNumber == codeRunResults.size()) {
-				judgeResponse = JRBuilder.resultStatus(777)
+				judgeResponse = JRBuilder.resultStatus(1000)
 													.passTestCasesNumber(passTestCasesNumber)
 													.noPassTestCaseId(0)
 													.resultMessage(Base64.encode("Accepted"))
@@ -438,6 +438,7 @@ public class RustCodeSandBox implements CodeSandBox {
 													.build();
 			}
 		}
+		codeFileClean(codeFileParentDir.toString());
 		return judgeResponse;
 	}
 
@@ -491,8 +492,8 @@ public class RustCodeSandBox implements CodeSandBox {
 		}
 		// 封装 执行请求的 json 文件
 		Function<String, Integer> langMap = (String langType) -> {
-			if (langType == "java") return 2;
-			else if (langType == "python") return 3;
+			if (langType.equals("java")) return 2;
+			else if (langType.equals("python")) return 3;
 			else return 1;
 		};
 		var requestArgsbuilder = RequestArgs.builder();
@@ -613,7 +614,7 @@ public class RustCodeSandBox implements CodeSandBox {
 		var hostConfig = new HostConfig();
 		log.info("挂载目录:" + codeFileParentDir.getParent().toString());
 		hostConfig.setBinds(new Bind(codeFileParentDir.getParent().toString(), new Volume("/codeStore")));
-		hostConfig.withMemory(384 * 1024 * 1024L);
+		hostConfig.withMemory(256 * 1024 * 1024L);
 		hostConfig.withCpuCount(1L);
 		
 		String seccompProfile = null;
@@ -697,7 +698,7 @@ public class RustCodeSandBox implements CodeSandBox {
 				String normalOutput = ProcessUtil.getProcessOutput(runProcess.getInputStream(), exitValue);
 				normalOutput = Base64.decodeStr(normalOutput);
 				List<Response> exec_resp = JSONUtil.toList(JSONUtil.parseArray(normalOutput), Response.class);
-				exec_resp.forEach(System.out::println);
+				// exec_resp.forEach(System.out::println);
 				return exec_resp;
 			}
 			/* execute_core 系统异常 (500 错误) */
