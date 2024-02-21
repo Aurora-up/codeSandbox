@@ -40,3 +40,10 @@ cd /home/<user_name>/codeSandBox
 
 docker built -t sandbox .
 ```
+
+```sh
+# 编译 cargo 项目
+cd /home/<user_name>/codeSandBox/execute_core
+cargo build --release
+cp -r /home/<user_name>/codeSandBox/execute_core/target/release /home/<user_name>/codeSandBox/tempCodeRepository/execute_core
+```
