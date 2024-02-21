@@ -12,14 +12,13 @@ import com.app.module.judge.JudgeRequest;
 import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
 import com.app.service.impl.DockerCodeSandBox;
-import com.app.service.impl.DockerCodeSandBox;
 
 import reactor.core.publisher.Mono;
 
 /**
  * @author HDD
  * @date 2024年02月04日
- * @description TODO
+ * @description 评测机接口
  */
 @RestController
 public class CodeExecuteController {
@@ -31,6 +30,11 @@ public class CodeExecuteController {
     this.codeSandBox = dockerCodeSandBox;
   }
 
+  /**
+   * 评测机调试接口
+   * @param debugRequest 调试请求
+   * @return 调试结果
+   */
   @PostMapping("/debug")
   public Mono<Result> codeDebug(@RequestBody DebugRequest debugRequest) {
     var RSbuilder = Result.builder();
@@ -40,8 +44,13 @@ public class CodeExecuteController {
     DebugResponse debugResponse = codeSandBox.codeDebug(debugRequest);
     return Mono.just(RSbuilder.statusCode(1).msg("调试完成").data(debugResponse).build());
   }
-  @PostMapping("/run")
-  public Mono<Result> codeDebug(@RequestBody JudgeRequest judgeRequest) {
+  /**
+   * 评测机评审接口
+   * @param judgeRequest 评测请求
+   * @return 评测结果
+   */
+  @PostMapping("/judge")
+  public Mono<Result> codeJudge(@RequestBody JudgeRequest judgeRequest) {
     var RSbuilder = Result.builder();
     if (judgeRequest.equals(null)) { 
       return Mono.just(Result.error("请求参数为空"));
