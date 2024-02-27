@@ -25,4 +25,17 @@ public class DebugRequest {
 	 * 代码的编程语言
 	 */
 	String lang;
+
+	/**
+	 * 内容判空
+	 * @return
+	 */
+	public Boolean isNull() {
+		if ((this.code == null || this.code.trim().equals("")) && 
+				(this.input == null || this.input.trim().equals("")) && 
+				(this.lang == null || this.lang.trim().equals(""))) {
+			return true;
+		}
+		return false;
+	}
 }

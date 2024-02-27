@@ -25,4 +25,17 @@ public class TestCase {
 	 * 测试数据的正确结果
 	 */
 	String correctResult;
+
+	/**
+	 * 内容判空
+	 * @return
+	 */
+	public Boolean isNull() {
+		if ((this.id == null) && 
+				(this.input == null || this.input.trim().equals("")) && 
+				(this.correctResult == null || this.correctResult.trim().equals(""))) {
+			return true;
+		}
+		return false;
+	}
 }

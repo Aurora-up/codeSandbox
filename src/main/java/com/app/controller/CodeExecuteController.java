@@ -38,7 +38,7 @@ public class CodeExecuteController {
   @PostMapping("/debug")
   public Mono<Result> codeDebug(@RequestBody DebugRequest debugRequest) {
     var RSbuilder = Result.builder();
-    if (debugRequest.equals(null)) { 
+    if (debugRequest.isNull()) { 
       return Mono.just(Result.error("请求参数为空"));
     }
     DebugResponse debugResponse = codeSandBox.codeDebug(debugRequest);
@@ -52,7 +52,7 @@ public class CodeExecuteController {
   @PostMapping("/judge")
   public Mono<Result> codeJudge(@RequestBody JudgeRequest judgeRequest) {
     var RSbuilder = Result.builder();
-    if (judgeRequest.equals(null)) { 
+    if (judgeRequest.isNull()) { 
       return Mono.just(Result.error("请求参数为空"));
     }
     JudgeResponse judgeResponse = codeSandBox.codeJudge(judgeRequest);

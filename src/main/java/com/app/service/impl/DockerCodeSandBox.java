@@ -5,7 +5,8 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.json.JSONUtil;
 
-import com.app.module.CodeExecuteResult;
+import com.app.module.ProcessExecuteResult;
+import com.app.module.LangType;
 import com.app.module.debug.DebugRequest;
 import com.app.module.debug.DebugResponse;
 import com.app.module.execute.RequestArgs;
@@ -13,12 +14,14 @@ import com.app.module.execute.Response;
 import com.app.module.judge.JudgeRequest;
 import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
+import com.app.utils.CodeLangAdaptUtil;
 import com.app.utils.ProcessUtil;
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.PullImageResultCallback;
+import com.github.dockerjava.api.command.BuildImageCmd;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientBuilder;
+import com.github.dockerjava.core.command.BuildImageResultCallback;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.github.dockerjava.transport.DockerHttpClient;
 
@@ -47,20 +50,10 @@ import java.util.regex.Pattern;
 @SuppressWarnings("deprecation")
 public class DockerCodeSandBox implements CodeSandBox {
 	/* Docker 沙箱信息 */
-	private static final String ENVIRONMENT_DOCKER_IMAGE = "sandbox:latest";
+	private static final String ENVIRONMENT_DOCKER_IMAGE = "sandbox:1.0";
 	private static final String ENVIRONMENT_CONTAINER_NAME = "sandbox";
 	private static final String CODE_STORE_ROOT_PATH = "tempCodeRepository";
 	private static final String VOLUMN_CODE_STORE_ROOT_PATH = "/codeStore";
-	/* 各语言编译命令前缀和代码存储目标文件 */
-	private static final String RUST_CODE_FILE_NAME = "main.rs";
-	private static final String[] RUST_COMPILE_COMMAND = new String[] {"rustc"};
-	private static final String CPP_CODE_FILE_NAME = "main.cpp";
-	private static final String[] CPP_COMPILE_COMMAND = new String[] {"g++"};
-	private static final String C_CODE_FILE_NAME = "main.c";
-	private static final String[] C_COMPILE_COMMAND = new String[] {"gcc"};
-	private static final String JAVA_CODE_FILE_NAME = "Main.java";
-	private static final String[] JAVA_COMPILE_COMMAND = new String[] {"javac", "-encoding", "utf-8"};
-	private static final String PYTHON_CODE_FILE_NAME = "main.py";
 	/* 测试数据文件前缀 */
 	private static final String INPUT_NAME_PREFIX = "input-";
 	/* 代码调试限制 (相对宽松)  */ 
@@ -76,19 +69,22 @@ public class DockerCodeSandBox implements CodeSandBox {
 	@Override
 	public DebugResponse codeDebug(DebugRequest debugRequest) {
 		var respBuilder = DebugResponse.builder();
-		String code = debugRequest.getCode();
+		String code = Base64.decodeStr(debugRequest.getCode());
 		String lang = debugRequest.getLang();
-		String input = debugRequest.getInput();
+		String input = Base64.decodeStr(debugRequest.getInput());
 		List<String> inputList = new ArrayList<>();
 		if (input != null) {
 			inputList.add(input.trim());
 		} else {
 			inputList.add("");
 		}
-		/* 用户代码隔离 */
+
+		/* 1. 用户代码隔离 */
 		Path codeFileParentDir = tackleCodeStorageAndIsolation(code, inputList, lang, TIME_LIMIT, Memory_LIMIT);
-		/* 代码编译 */
+
+		/* 2. 代码编译 */
 		var codeCompileResult = codeCompile(codeFileParentDir.toString(), lang);
+
 		// 编译失败 (Compiler Error)
 		if (codeCompileResult.getExitValue() != 0) {
 			/* 代码编译错误输出过滤 */
@@ -122,7 +118,8 @@ public class DockerCodeSandBox implements CodeSandBox {
 					.resultMessage(Base64.encode(tackleOutput.apply(codeCompileResult.getErrorResult(), lang)))
 					.build();
 		}
-		/* 初始化 Docker 客户端 */
+
+		/* 3. 初始化 Docker 客户端 */
     DefaultDockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
 		DockerHttpClient dockerHttpClient = new ApacheDockerHttpClient.Builder()
 																	.dockerHost(config.getDockerHost())
@@ -136,8 +133,9 @@ public class DockerCodeSandBox implements CodeSandBox {
 			dockerClient.startContainerCmd(containerId).exec(); // 启动容器
 		}
 
-		/* 代码运行 */
+		/* 4. 代码运行 */
 		var codeRunResults = DockerCodeSandBox.codeRun(dockerClient, containerId, codeFileParentDir);
+		
 		var debugResponse = new DebugResponse();
 		Response codeRunResult = new Response();
 		try {
@@ -453,41 +451,25 @@ public class DockerCodeSandBox implements CodeSandBox {
 	 * @return 用户提交代码存放的目录
 	 */
 	private static Path tackleCodeStorageAndIsolation(String code, List<String> inputList, String lang, Long timieLimit, Long memoryLimit) {
-		/* 创建代码存放目录 */
-		String userDir = System.getProperty("user.dir");
-		String codeStoreRootPath = userDir + File.separator + CODE_STORE_ROOT_PATH;
+		/* 1. 创建代码存放的 "根目录" 的绝对路径 */
+		String projectDirPath = System.getProperty("user.dir");
+		String codeStoreRootPath = projectDirPath + File.separator + CODE_STORE_ROOT_PATH;
 		if (!FileUtil.exist(codeStoreRootPath)) {
 			FileUtil.mkdir(codeStoreRootPath);
 		}
-		/* 隔离用户提交的代码文件和测试数据 */
-		String secondDir = UUID.randomUUID().toString();
-		String userCodeRootPath = codeStoreRootPath + File.separator + secondDir;
+
+		/* 2. 隔离用户提交的代码文件和测试数据在单独目录 */
+		String isolcationDirName = UUID.randomUUID().toString();
+		String userCodeIsolationDirPath = codeStoreRootPath + File.separator + isolcationDirName;
 		String CODE_FILE_NAME = null;
-		switch (lang) {
-			case "cpp":
-				CODE_FILE_NAME = CPP_CODE_FILE_NAME;
-				break;
-			case "c":
-				CODE_FILE_NAME = C_CODE_FILE_NAME;
-				break;
-			case "java":
-				CODE_FILE_NAME = JAVA_CODE_FILE_NAME;
-				break;
-			case "rust":
-				CODE_FILE_NAME = RUST_CODE_FILE_NAME;
-				break;
-			case "python":
-				CODE_FILE_NAME = PYTHON_CODE_FILE_NAME;
-				break;
-			default:
-				break;
-		}
-		String userCodePath = userCodeRootPath + File.separator + CODE_FILE_NAME;
-		// 创建 main.c / main.cpp / main.rs / Main.java / main.py
-		File userCodeFile = FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
+		CODE_FILE_NAME = CodeLangAdaptUtil.codeStoreFileNameAdapt(LangType.getByLangName(lang));
+		String userCodeFilePath = userCodeIsolationDirPath + File.separator + CODE_FILE_NAME;
+
+		// 创建 main.c / main.cpp / main.rs / Main.java / main.py 文件
+		File userCodeFile = FileUtil.writeString(code, userCodeFilePath, StandardCharsets.UTF_8);
 		// 创建测试数据文件
 		for (int i = 0; i < inputList.size(); i++) {
-			String inputFilePath = userCodeRootPath + File.separator + INPUT_NAME_PREFIX + (i + 1) + ".txt";
+			String inputFilePath = userCodeIsolationDirPath + File.separator + INPUT_NAME_PREFIX + (i + 1) + ".txt";
 			FileUtil.writeString(inputList.get(i).trim(), inputFilePath, StandardCharsets.UTF_8);
 		}
 		// 封装 执行请求的 json 文件
@@ -500,15 +482,16 @@ public class DockerCodeSandBox implements CodeSandBox {
 		var requestArgs = requestArgsbuilder
 			.time_limit(timieLimit)
 			.memory_limit(memoryLimit)
-			.file_dir(VOLUMN_CODE_STORE_ROOT_PATH + File.separator + secondDir + File.separator)
+			.file_dir(VOLUMN_CODE_STORE_ROOT_PATH + File.separator + isolcationDirName + File.separator)
 			.test_case_num(Math.max(1, inputList.size()))
 			.lang(langMap.apply(lang))
 			.build();
 		String jsonString = JSONUtil.toJsonStr(requestArgs);
 		String jsonFilePath = "request_args.json";
-		FileUtil.writeUtf8String(jsonString, userCodeRootPath + File.separator + jsonFilePath);
+		FileUtil.writeUtf8String(jsonString, userCodeIsolationDirPath + File.separator + jsonFilePath);
 		// 封装 file_dir.txt
-		FileUtil.writeString(VOLUMN_CODE_STORE_ROOT_PATH + File.separator + secondDir + File.separator, userCodeRootPath + File.separator + "file-dir.txt", StandardCharsets.UTF_8);
+		FileUtil.writeString(VOLUMN_CODE_STORE_ROOT_PATH + File.separator + isolcationDirName + File.separator,
+												 userCodeIsolationDirPath + File.separator + "file-dir.txt", StandardCharsets.UTF_8);
 		/* 返回用户提交的代码文件所在的目录 */
 		return Paths.get(userCodeFile.getParentFile().getAbsolutePath());
 	}
@@ -520,45 +503,18 @@ public class DockerCodeSandBox implements CodeSandBox {
 	 * @param lang 编程语言
 	 * @return 编译结果信息
 	 */
-	private static CodeExecuteResult codeCompile(String codeFileParentDir, String lang) {
-		var messageBuild = CodeExecuteResult.builder();
+	private static ProcessExecuteResult codeCompile(String codeFileParentDir, String lang) {
+		var messageBuild = ProcessExecuteResult.builder();
 		String[] compileCommand = new String[]{};
 		/* 匹配对应编程语言的编译命令 */
-		switch (lang) {
-			case "cpp":
-				compileCommand = ArrayUtil.append(
-					CPP_COMPILE_COMMAND, 
-					codeFileParentDir + File.separator + CPP_CODE_FILE_NAME,
-					"-o", 
-					codeFileParentDir + File.separator + "main");
-				break;
-			case "c":
-				compileCommand = ArrayUtil.append(
-					C_COMPILE_COMMAND, 
-					codeFileParentDir + File.separator + C_CODE_FILE_NAME,
-					"-o", 
-					codeFileParentDir + File.separator + "main");
-				break;
-			case "java":
-				compileCommand = ArrayUtil.append(
-					JAVA_COMPILE_COMMAND, 
-					codeFileParentDir + File.separator + JAVA_CODE_FILE_NAME);
-				break;
-			case "rust":
-				compileCommand = ArrayUtil.append(
-					RUST_COMPILE_COMMAND, 
-					"-o", 
-					codeFileParentDir + File.separator + "main",
-					codeFileParentDir + File.separator + RUST_CODE_FILE_NAME);
-				break;
-			default:
-				break;
+		if (!lang.equals("python")) {
+			compileCommand = CodeLangAdaptUtil.codeCompileCommandArgsAdapt(LangType.getByLangName(lang), codeFileParentDir);
 		}
 		var processBuilder = new ProcessBuilder(compileCommand);
 		try {
 			Process compileProcess = processBuilder.start();
 			int exitValue = compileProcess.waitFor();
-			CodeExecuteResult message = new CodeExecuteResult();
+			ProcessExecuteResult message = new ProcessExecuteResult();
 			/* 编译成功 */
 			if (exitValue == 0) {
 				message = messageBuild.exitValue(0)
@@ -580,24 +536,29 @@ public class DockerCodeSandBox implements CodeSandBox {
 	}
 
 	/**
-	 * 拉取代码沙箱环境的镜像
-	 *
+	 * 根据 Dockerfile 文件创建代码沙箱环境的镜像
 	 * @param dockerClient docker 客户端
 	 */
-	private static void pullSandBoxImage(DockerClient dockerClient) {
-		var pullImageCmd = dockerClient.pullImageCmd(ENVIRONMENT_DOCKER_IMAGE);
-		var pullImageResultCallback = new PullImageResultCallback() {
+	private static void createSandBoxImage(DockerClient dockerClient) {
+		String projectDirPath = System.getProperty("user.dir");
+		File Dockerfile = new File(projectDirPath + File.separator + "Dockerfile");
+		BuildImageCmd buildImageCmd = dockerClient.buildImageCmd(Dockerfile);
+		Set<String> name = new HashSet<String>();
+		name.add("sandbox:1.0");
+		buildImageCmd.withTags(name);
+		var buildImageResultCallback = new BuildImageResultCallback() {
 			@Override
-			public void onNext(PullResponseItem item) {
-				log.info("下载代码沙箱环境镜像中: " + item.getStatus());
+			public void onNext(BuildResponseItem item) {
+				log.info("创建代码沙箱环境镜像中: " + item.toString());
 				super.onNext(item);
 			}
 		};
 		try {
-			pullImageCmd.exec(pullImageResultCallback)
+			buildImageCmd.exec(buildImageResultCallback)
 					.awaitCompletion();
+			log.info("代码沙箱创建成功");
 		} catch (InterruptedException e) {
-			log.error("拉取代码沙箱环境镜像失败");
+			log.error("创建代码沙箱环境镜像失败");
 			e.printStackTrace();
 		}
 	}
@@ -657,7 +618,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 
 		String containerId;
 		if (existedImage.isEmpty() && existedContainer.isEmpty()) {
-			pullSandBoxImage(dockerClient);
+			createSandBoxImage(dockerClient);
 			containerId = createSandBoxContainer(codeFileParentDir, dockerClient);
 		} else if (!existedImage.isEmpty() && existedContainer.isEmpty()) {
 			containerId = createSandBoxContainer(codeFileParentDir, dockerClient);
@@ -698,7 +659,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 				String normalOutput = ProcessUtil.getProcessOutput(runProcess.getInputStream(), exitValue);
 				normalOutput = Base64.decodeStr(normalOutput);
 				List<Response> exec_resp = JSONUtil.toList(JSONUtil.parseArray(normalOutput), Response.class);
-				// exec_resp.forEach(System.out::println);
+				exec_resp.forEach(System.out::println);
 				return exec_resp;
 			}
 			/* execute_core 系统异常 (500 错误) */
@@ -735,7 +696,6 @@ public class DockerCodeSandBox implements CodeSandBox {
 		}
 		return classPath;
 	}
-
 
 	/**
 	 * 用户代码文件清理

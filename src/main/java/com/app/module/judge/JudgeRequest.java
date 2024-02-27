@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.function.Function;
 /**
  * @author HDD
  * @date 2024年02月04日
@@ -34,4 +35,26 @@ public class JudgeRequest{
 	 * 内存限制
 	 */
 	Long memoryLimit;
+	/**
+	 * 内容判空
+	 * @return
+	 */
+	public Boolean isNull() {
+		Function<List<TestCase>, Boolean> testCastIsNull = (List<TestCase> testCases) -> {
+			for (var e: testCases) {
+				if (e.isNull()) {
+					return true;
+				}
+			}
+			return false;
+		};
+		if ((this.testCases.isEmpty() || testCastIsNull.apply(this.testCases)) &&
+				(this.code == null || this.code.trim().equals("")) && 
+				(this.timeLimit == null) && 
+				(this.memoryLimit == null) && 
+				(this.lang == null || this.lang.trim().equals(""))) {
+			return true;
+		}
+		return false;
+	}
 }
