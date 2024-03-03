@@ -60,6 +60,31 @@ public class DockerCodeSandBox implements CodeSandBox {
 	private static final Long TIME_LIMIT = 2000L; // 2s
 	private static final Long Memory_LIMIT = 128 * 1024 * 1024L; // 128MB
 
+	private static DockerClient dockerClient;
+	static {
+		/* 创建代码存放的 "根目录" 的绝对路径 */
+		String projectDirPath = System.getProperty("user.dir");
+		String codeStoreRootPath = projectDirPath + File.separator + CODE_STORE_ROOT_PATH;
+		if (!FileUtil.exist(codeStoreRootPath)) {
+			FileUtil.mkdir(codeStoreRootPath);
+		}
+		/* 初始化 Docker 客户端 */
+		try {
+			DefaultDockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
+			DockerHttpClient dockerHttpClient = new ApacheDockerHttpClient.Builder()
+																		.dockerHost(config.getDockerHost())
+																		.sslConfig(config.getSSLConfig())
+																		.maxConnections(3000) // 最大连接数根据需求设定
+																		.build();
+			dockerClient = DockerClientBuilder.getInstance(config).withDockerHttpClient(dockerHttpClient).build();
+		} catch (Exception e) {
+			log.error("初始化 Docker Client 错误", e);
+		}
+		// todo 检查 tempCodeRespority 下的 exectue_core 是否存在
+		// 若不存在则编译 rust 项目至该目录下
+		
+	}
+
 	/**
 	 * 代码调试
 	 * 
@@ -114,27 +139,21 @@ public class DockerCodeSandBox implements CodeSandBox {
 				}
 				return errorResult;
 			};
+			codeFileClean(codeFileParentDir.toString());
 			return respBuilder.resultStatus(1001)
 					.resultMessage(Base64.encode(tackleOutput.apply(codeCompileResult.getErrorResult(), lang)))
 					.build();
 		}
 
-		/* 3. 初始化 Docker 客户端 */
-    DefaultDockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
-		DockerHttpClient dockerHttpClient = new ApacheDockerHttpClient.Builder()
-																	.dockerHost(config.getDockerHost())
-																	.sslConfig(config.getSSLConfig())
-																	.maxConnections(1000)
-																	.build();
-		var dockerClient = DockerClientBuilder.getInstance(config).withDockerHttpClient(dockerHttpClient).build();
-		String containerId = getContainerId(dockerClient, codeFileParentDir);
-		var containerInfo = dockerClient.inspectContainerCmd(containerId).exec();
+		/* 3. 启动 Docker 容器 */
+		String containerId = getContainerId(DockerCodeSandBox.dockerClient, codeFileParentDir);
+		var containerInfo = DockerCodeSandBox.dockerClient.inspectContainerCmd(containerId).exec();
 		if (Boolean.FALSE.equals(containerInfo.getState().getRunning())) {
-			dockerClient.startContainerCmd(containerId).exec(); // 启动容器
+			DockerCodeSandBox.dockerClient.startContainerCmd(containerId).exec(); // 启动容器
 		}
 
 		/* 4. 代码运行 */
-		var codeRunResults = DockerCodeSandBox.codeRun(dockerClient, containerId, codeFileParentDir);
+		var codeRunResults = DockerCodeSandBox.codeRun(DockerCodeSandBox.dockerClient, containerId, codeFileParentDir);
 		
 		var debugResponse = new DebugResponse();
 		Response codeRunResult = new Response();
@@ -220,6 +239,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 						.memory(memory)
 						.build();
 		}
+		codeFileClean(codeFileParentDir.toString());
 		return debugResponse;
 	}
 
@@ -240,7 +260,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 			return Base64.decodeStr(e.getInput()); // --------------------
 		}).toList();
 		Path codeFileParentDir = tackleCodeStorageAndIsolation(code, inputList, lang, timeLimit, memoryLimit);
-		/* 代码编译 */
+		/* 2. 代码编译 */
 		var codeCompileResult = codeCompile(codeFileParentDir.toString(), lang);
 		// 编译失败 (Compiler Error)
 		if (codeCompileResult.getExitValue() != 0) {
@@ -271,6 +291,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 				}
 				return errorResult;
 			};
+			codeFileClean(codeFileParentDir.toString());
 			return JRBuilder.resultStatus(1001)
 					.resultMessage(Base64.encode(tackleOutput.apply(codeCompileResult.getErrorResult(), lang)))
 					.build();
@@ -280,20 +301,14 @@ public class DockerCodeSandBox implements CodeSandBox {
 		HashMap<Integer, String> mp = new HashMap<>();
 		judgeRequest.getTestCases().forEach(testCase -> mp.put(testCase.getId(), testCase.getCorrectResult()));
 
-    DefaultDockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
-		DockerHttpClient dockerHttpClient = new ApacheDockerHttpClient.Builder()
-																	.dockerHost(config.getDockerHost())
-																	.sslConfig(config.getSSLConfig())
-																	.maxConnections(1000)
-																	.build();
-		var dockerClient = DockerClientBuilder.getInstance(config).withDockerHttpClient(dockerHttpClient).build();
-		String containerId = getContainerId(dockerClient, codeFileParentDir);
-		var containerInfo = dockerClient.inspectContainerCmd(containerId).exec();
+		/* 3. 启动 Docker 容器 */
+		String containerId = getContainerId(DockerCodeSandBox.dockerClient, codeFileParentDir);
+		var containerInfo = DockerCodeSandBox.dockerClient.inspectContainerCmd(containerId).exec();
 		if (Boolean.FALSE.equals(containerInfo.getState().getRunning())) {
-			dockerClient.startContainerCmd(containerId).exec(); // 启动容器
+			DockerCodeSandBox.dockerClient.startContainerCmd(containerId).exec(); // 启动容器
 		}
-		/* 代码运行 */
-		var codeRunResults = DockerCodeSandBox.codeRun(dockerClient, containerId, codeFileParentDir);
+		/* 4. 代码运行 */
+		var codeRunResults = DockerCodeSandBox.codeRun(DockerCodeSandBox.dockerClient, containerId, codeFileParentDir);
 		var judgeResponse = new JudgeResponse();
 		var codeRunResultFirst = new Response();
 		try {
@@ -454,9 +469,6 @@ public class DockerCodeSandBox implements CodeSandBox {
 		/* 1. 创建代码存放的 "根目录" 的绝对路径 */
 		String projectDirPath = System.getProperty("user.dir");
 		String codeStoreRootPath = projectDirPath + File.separator + CODE_STORE_ROOT_PATH;
-		if (!FileUtil.exist(codeStoreRootPath)) {
-			FileUtil.mkdir(codeStoreRootPath);
-		}
 
 		/* 2. 隔离用户提交的代码文件和测试数据在单独目录 */
 		String isolcationDirName = UUID.randomUUID().toString();
@@ -659,7 +671,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 				String normalOutput = ProcessUtil.getProcessOutput(runProcess.getInputStream(), exitValue);
 				normalOutput = Base64.decodeStr(normalOutput);
 				List<Response> exec_resp = JSONUtil.toList(JSONUtil.parseArray(normalOutput), Response.class);
-				exec_resp.forEach(System.out::println);
+				// exec_resp.forEach(System.out::println);
 				return exec_resp;
 			}
 			/* execute_core 系统异常 (500 错误) */
