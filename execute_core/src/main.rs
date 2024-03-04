@@ -3,10 +3,9 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use execute_core::entity::{RequestArgs, Response};
 use psutil::process::Process;
-use std::future::IntoFuture;
 use std::process::{exit, Stdio};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::sync::{mpsc, Mutex};
@@ -18,29 +17,25 @@ use tokio::time::timeout;
 ///     pid: 执行进程 ID <br>
 ///     memory_limit: 内存限制 <br>
 ///     sender: 监控结果发送管道 <br>
-async fn monitor_thread(pid: u32, memory_limit: u64, sender: mpsc::Sender<(u128, u64)>) {
-    let mut use_time: u128 = 1; // 执行时间小于 1ms 的统一为 1ms
+async fn monitor_thread(pid: u32, memory_limit: u64, sender: mpsc::Sender<u64>) {
     let mut use_memory: u64 = 0;
     if let Ok(process_util) = Process::new(pid) {
         while process_util.is_running() {
-            if let Ok(_time) = process_util.cpu_times() {
-                use_time = std::cmp::max(use_time, _time.user().as_millis());
-            }
             if let Ok(_memory) = process_util.memory_info() {
                 use_memory = std::cmp::max(use_memory, _memory.rss());
             }
             /* 内存超出限制 */
             if use_memory > memory_limit {
                 use_memory = memory_limit + 1;
-                let _ = sender.send((use_time, use_memory)).await;
+                let _ = sender.send(use_memory).await;
                 process_util.kill().unwrap();
                 break;
             }
             tokio::time::sleep(Duration::from_micros(500)).await;
         }
     }
-    // 发送时间和内存信息
-    let _ = sender.send((use_time, use_memory)).await;
+    // 发送进程内存使用信息
+    let _ = sender.send(use_memory).await;
 }
 
 /// @description: 测试数据执行进程 <br>
@@ -83,6 +78,8 @@ async fn child_process(
     // let permission_path = format!("{}:{}", file_dir, "/codeStore");
     // let java_args = ["-Dfile.encoding=UTF-8", "-cp", permission_path.as_str(),"-Djava.security.manager=DenyPermission" ,"Main"];
     let java_args = ["-cp", file_dir.as_str() ,"Main"];
+    let python_file_path = format!("{}main.py", file_dir);
+    let python_args = [python_file_path.as_str()];
 
     match lang {
         1 => {
@@ -94,6 +91,7 @@ async fn child_process(
         }
         _ => {
             run_command = Command::new("python3");
+            command_args = Some(&python_args);
         }
     }
 
@@ -102,11 +100,13 @@ async fn child_process(
         Some(args) => run_command.args(args),
         None => &mut run_command,
     }
-    .stdin(Stdio::piped())
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped())
-    .spawn()
-    .expect("执行命令异常");
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("执行命令异常");
+    let _current_time = SystemTime::now();
+    let process_spawn_time = _current_time.duration_since(UNIX_EPOCH).expect("获取系统时间错误!").as_millis();
 
     if let Some(mut stdin) = run_process.stdin.take() {
         stdin
@@ -118,7 +118,7 @@ async fn child_process(
     let pid = run_process.id().expect("无法获取到执行进程 ID");
 
     /* 定义监控结果的收发管道 */
-    let (sender, mut receiver) = mpsc::channel::<(u128, u64)>(2);
+    let (sender, mut receiver) = mpsc::channel::<u64>(2);
     let sender = Arc::new(Mutex::new(sender));
 
     let cloned_sender = Arc::clone(&sender);
@@ -134,44 +134,47 @@ async fn child_process(
     match timeout(
         Duration::from_millis(time_limit.try_into().unwrap()),
         run_process.wait(),
-    )
-    .await
+    ).await
     {
-        Ok(process_result) => match process_result {
-            /* 获取进程执行状态 */
-            Ok(process_status) => {
-                /* 正常输出 */
-                if process_status.success() {
-                    let mut normal_output = String::new();
-                    if let Some(mut stdout) = run_process.stdout.take() {
-                        response.set_exit_code(1000);
-                        stdout.read_to_string(&mut normal_output).await.unwrap();
-                        response.set_output_msg(general_purpose::STANDARD.encode(normal_output.trim_end_matches('\n')));
+        Ok(process_result) => {
+            let current_time = SystemTime::now();
+            let process_stop_time = current_time.duration_since(UNIX_EPOCH).expect("获取系统时间错误!").as_millis();
+            match process_result {
+                /* 获取进程执行状态 */
+                Ok(process_status) => {
+                    /* 正常输出 */
+                    if process_status.success() {
+                        let mut normal_output = String::new();
+                        if let Some(mut stdout) = run_process.stdout.take() {
+                            response.set_exit_code(1000);
+                            stdout.read_to_string(&mut normal_output).await.unwrap();
+                            response.set_output_msg(general_purpose::STANDARD.encode(normal_output.trim_end_matches('\n')));
+                        }
                     }
-                }
-                /* 异常输出 */
-                else {
-                    let mut error_output = String::new();
-                    if let Some(mut stderr) = run_process.stderr.take() {
-                        response.set_exit_code(1002);
-                        stderr.read_to_string(&mut error_output).await.unwrap();
-                        response.set_output_msg(general_purpose::STANDARD.encode(error_output));
+                    /* 异常输出 */
+                    else {
+                        let mut error_output = String::new();
+                        if let Some(mut stderr) = run_process.stderr.take() {
+                            response.set_exit_code(1002);
+                            stderr.read_to_string(&mut error_output).await.unwrap();
+                            response.set_output_msg(general_purpose::STANDARD.encode(error_output));
+                        }
                     }
-                }
-                /* 内存溢出输出 */
-                if let Some((use_time, use_memory)) = receiver.recv().await {
-                    response.set_time(use_time);
-                    response.set_memory(use_memory);
-                    if use_memory == memory_limit + 1 {
-                        response.set_exit_code(1004);
-                        response.set_output_msg("Memory Exceeded Limit");
+                    /* 内存溢出输出 */
+                    if let Some(use_memory) = receiver.recv().await {
+                        let use_time = std::cmp::max(1, process_stop_time - process_spawn_time);
+                        response.set_time(use_time);
+                        response.set_memory(use_memory);
+                        if use_memory == memory_limit + 1 {
+                            response.set_exit_code(1004);
+                            response.set_output_msg("Memory Exceeded Limit");
+                        }
                     }
+                    result_sender.send(response).await.unwrap();
                 }
-
-                result_sender.send(response).await.unwrap();
-            }
-            Err(err) => {
-                eprintln!("无法获取进程状态: {}", err);
+                Err(err) => {
+                    eprintln!("无法获取进程状态: {}", err);
+                }
             }
         },
         Err(_) => {
@@ -182,7 +185,7 @@ async fn child_process(
                     .expect("超出时间限制后终止线程异常");
             }
 
-            if let Some((_, use_memory)) = receiver.recv().await {
+            if let Some(use_memory) = receiver.recv().await {
                 response.set_memory(use_memory);
             }
 

@@ -586,7 +586,13 @@ public class DockerCodeSandBox implements CodeSandBox {
 		var containerCmd = dockerClient.createContainerCmd(ENVIRONMENT_DOCKER_IMAGE).withName(ENVIRONMENT_CONTAINER_NAME);
 		var hostConfig = new HostConfig();
 		log.info("挂载目录:" + codeFileParentDir.getParent().toString());
-		hostConfig.setBinds(new Bind(codeFileParentDir.getParent().toString(), new Volume("/codeStore")));
+		
+		hostConfig.setBinds(
+			new Bind(codeFileParentDir.getParent().toString(), new Volume("/codeStore")),
+			// 挂载宿主机的 /etc/localtime 和 /etc/timezone 文件到容器 (配置时区)
+			new Bind("/etc/localtime", new Volume("/etc/localtime")),
+			new Bind("/etc/timezone", new Volume("/etc/timezone"))
+		);
 		hostConfig.withMemory(256 * 1024 * 1024L);
 		hostConfig.withCpuCount(1L);
 		
