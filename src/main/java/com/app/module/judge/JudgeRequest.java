@@ -48,10 +48,10 @@ public class JudgeRequest{
 			}
 			return false;
 		};
-		if ((this.testCases.isEmpty() || testCastIsNull.apply(this.testCases)) &&
-				(this.code == null || this.code.trim().equals("")) && 
-				(this.timeLimit == null) && 
-				(this.memoryLimit == null) && 
+		if ((this.testCases == null || this.testCases.isEmpty() || testCastIsNull.apply(this.testCases)) ||
+				(this.code == null || this.code.trim().equals("")) ||
+				(this.timeLimit == null) ||
+				(this.memoryLimit == null) ||
 				(this.lang == null || this.lang.trim().equals(""))) {
 			return true;
 		}

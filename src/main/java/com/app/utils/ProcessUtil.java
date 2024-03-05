@@ -5,13 +5,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-import org.springframework.stereotype.Component;
 /**
  * @author HDD
  * @date 2024年02月04日
  * @description 进程工具类
  */
-@Component
 public class ProcessUtil {
 	/**
 	 * 内存监控线程类

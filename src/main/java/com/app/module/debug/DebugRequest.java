@@ -31,8 +31,8 @@ public class DebugRequest {
 	 * @return
 	 */
 	public Boolean isNull() {
-		if ((this.code == null || this.code.trim().equals("")) && 
-				(this.input == null || this.input.trim().equals("")) && 
+		if ((this.code == null || this.code.trim().equals("")) ||
+				(this.input == null || this.input.trim().equals("")) || 
 				(this.lang == null || this.lang.trim().equals(""))) {
 			return true;
 		}

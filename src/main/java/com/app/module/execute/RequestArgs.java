@@ -26,17 +26,17 @@ public class RequestArgs {
   /**
    * 测试数据数量
    */
-  Integer test_case_num;
+  Integer testCaseNum;
   /**
    * 时间限制 (单位: ms)
    */
-  Long time_limit;
+  Long timeLimit;
   /**
    * 内存限制 (单位: B)
    */
-  Long memory_limit;
+  Long memoryLimit;
   /**
    * 隔离存放的目录
    */
-  String file_dir;
+  String fileDir;
 }

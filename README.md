@@ -14,9 +14,6 @@ sudo apt install openjdk-17-jdk
 # mvn 安装
 sudo apt install maven
 
-# rust 环境
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
 # 安装 docker
 sudo apt install docker.io
 ```
@@ -38,12 +35,5 @@ newgrp docker
 ```sh
 cd /home/<user_name>/codeSandBox
 
-docker build -t sandbox .
-```
-
-```sh
-# 编译 cargo 项目
-cd /home/<user_name>/codeSandBox/execute_core
-cargo build --release
-cp -r /home/<user_name>/codeSandBox/execute_core/target/release /home/<user_name>/codeSandBox/tempCodeRepository/execute_core
+docker build -t sandbox:2.0 .
 ```
