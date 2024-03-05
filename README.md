@@ -38,7 +38,7 @@ newgrp docker
 ```sh
 cd /home/<user_name>/codeSandBox
 
-docker built -t sandbox .
+docker build -t sandbox .
 ```
 
 ```sh
