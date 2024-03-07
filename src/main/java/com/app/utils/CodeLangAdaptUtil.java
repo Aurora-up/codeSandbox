@@ -2,8 +2,10 @@ package com.app.utils;
 
 import java.io.File;
 
+import com.app.common.LangType;
+import com.app.common.StatusEnum;
+import com.app.exception.BusinessException;
 
-import com.app.module.LangType;
 import cn.hutool.core.util.ArrayUtil;
 
 /**
@@ -55,7 +57,7 @@ public class CodeLangAdaptUtil {
         codeStoreFileName = PYTHON_CODE_FILE_NAME;
         break;
       default:
-      throw new IllegalArgumentException("还未实现对 " + langType.getLangName() + " 的支持");
+        throw new BusinessException(StatusEnum.SYSTEM_ERROR, "暂不支持该编程语言");
     }
     return codeStoreFileName;
   }
@@ -99,9 +101,8 @@ public class CodeLangAdaptUtil {
           compileFilePath + File.separator + JAVA_CODE_FILE_NAME);
         break;
       default:
-        throw new IllegalArgumentException("还未实现对 " + langType.getLangName() + " 的支持");
+        throw new BusinessException(StatusEnum.SYSTEM_ERROR, "暂不支持该编程语言");
     }
     return compileCommand;
   }
-
 }

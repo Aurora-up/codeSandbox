@@ -11,6 +11,8 @@ import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
+import com.app.common.StatusEnum;
+import com.app.exception.BusinessException;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.BuildImageCmd;
 import com.github.dockerjava.api.model.Bind;
@@ -51,7 +53,7 @@ public class DockerUtil {
 																		.build();
 			dockerClient = DockerClientBuilder.getInstance(config).withDockerHttpClient(dockerHttpClient).build();
 		} catch (Exception e) {
-			log.error("初始化 Docker Client 错误", e);
+			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "初始化 Docker Client 错误" + e);			
 		}
 		/* java 代码运行时权限限制 */
 		// String permissionCheckFilePath = System.getProperty("user.dir") + File.separator + "tempCodeRepository"
@@ -91,9 +93,8 @@ public class DockerUtil {
 			if (flag.equals(0)) log.info("编译环境创建成功");
 			else 	log.info("代码沙箱创建成功");
 		} catch (InterruptedException e) {
-			if (flag.equals(0)) log.error("编译环境镜像失败");
-			else log.error("创建代码沙箱环境镜像失败");
-			e.printStackTrace();
+			if (flag.equals(0)) throw new BusinessException(StatusEnum.SYSTEM_ERROR, "编译环境镜像失败" + e);
+			else throw new BusinessException(StatusEnum.SYSTEM_ERROR, "创建代码沙箱环境镜像失败" + e);
 		}
 	}
 
@@ -137,8 +138,7 @@ public class DockerUtil {
 				String seccompProfilePath = projectDir + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "permission" + File.separator + "seccomp_profile_for_container.json";
 				seccompProfile = new String(Files.readAllBytes(Paths.get(seccompProfilePath)));
 			} catch (IOException e) {
-				log.error("无法读取到 seccomp 安全配置文件", e);
-				e.printStackTrace();
+				throw new BusinessException(StatusEnum.SYSTEM_ERROR, "无法读取到 seccomp 安全配置文件" + e);
 			}
 			hostConfig.withSecurityOpts(List.of("seccomp=" + seccompProfile));
 			

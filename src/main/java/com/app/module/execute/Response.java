@@ -1,5 +1,7 @@
 package com.app.module.execute;
 
+import com.alibaba.fastjson2.annotation.JSONField;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,6 +25,7 @@ public class Response {
    * 1003: 运行超时  (Time Limit Exceeded. TLE)
    * 1004: 运行内存超出限制 (Memory Limit Exceeded. MLE)
    */
+  @JSONField(name = "exit_code")
   Integer exitCode;
   /**
    * 程序运行时间 (单位 ms)
@@ -35,9 +38,11 @@ public class Response {
   /**
    * 程序输出信息 (包含正常/异常输出)
    */
+  @JSONField(name = "output_msg")
   String outputMsg;
   /**
    * 测试数据 ID
    */
+  @JSONField(name = "test_case_id")
   Integer testCaseId;
 }

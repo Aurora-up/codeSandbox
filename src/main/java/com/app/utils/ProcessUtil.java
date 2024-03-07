@@ -5,6 +5,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
+import com.app.common.StatusEnum;
+import com.app.exception.BusinessException;
+
 /**
  * @author HDD
  * @date 2024年02月04日
@@ -71,7 +74,7 @@ public class ProcessUtil {
 				}
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "获取进程输出异常. " + e);
 		}
 		return out.toString();
 	}

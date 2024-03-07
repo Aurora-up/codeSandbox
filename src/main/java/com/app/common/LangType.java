@@ -1,4 +1,6 @@
-package com.app.module;
+package com.app.common;
+
+import com.app.exception.BusinessException;
 
 /**
  * @author HDD
@@ -35,6 +37,6 @@ public enum LangType {
         return language;
       }
     }
-    throw new IllegalArgumentException("还未实现对 " + langName + " 的支持");
+    throw new BusinessException(StatusEnum.SYSTEM_ERROR, "暂不支持该编程语言");
   }
 }

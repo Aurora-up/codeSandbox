@@ -4,10 +4,14 @@ import cn.hutool.core.codec.Base64;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.lang.Pair;
 import cn.hutool.core.util.ArrayUtil;
-import cn.hutool.json.JSONUtil;
+import cn.hutool.core.util.IdUtil;
 
 import com.app.module.ProcessExecuteResult;
-import com.app.module.LangType;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.app.common.LangType;
+import com.app.common.StatusEnum;
+import com.app.exception.BusinessException;
 import com.app.module.debug.DebugRequest;
 import com.app.module.debug.DebugResponse;
 import com.app.module.execute.RequestArgs;
@@ -110,7 +114,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		try {
 			codeRunResult = codeRunResults.get(0);
 		} catch (IndexOutOfBoundsException e) {
-			log.error("代码运行结果返回为空, 导致在 codeDebug 中出现结果数组访问越界异常. ", e);
+			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "代码运行结果返回为空, 导致在 codeDebug 中出现结果数组访问越界异常. " + e);
 		}
 		Integer exitCode = codeRunResult.getExitCode();
 		String outputMsg = codeRunResult.getOutputMsg();
@@ -223,7 +227,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		try {
 			codeRunResultFirst = codeRunResults.get(0);
 		} catch (IndexOutOfBoundsException e) {
-			log.error("代码运行结果返回为空, 导致在 codeRun 中出现结果数组访问越界异常. ", e);
+			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "代码运行结果返回为空, 导致在 codeRun 中出现结果数组访问越界异常. " + e);
 		}
 		/* 判题系统出错 */
 		if (codeRunResultFirst.getExitCode() == 500) {
@@ -362,7 +366,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		String codeStoreRootPath = projectDirPath + File.separator + CODE_STORE_ROOT_PATH;
 
 		/* 2. 隔离用户提交的代码文件和测试数据在单独目录 */
-		String isolcationDirName = UUID.randomUUID().toString();
+		String isolcationDirName = IdUtil.getSnowflakeNextIdStr();
 		String userCodeIsolationDirPath = codeStoreRootPath + File.separator + isolcationDirName;
 		String CODE_FILE_NAME = null;
 		CODE_FILE_NAME = CodeLangAdaptUtil.codeStoreFileNameAdapt(LangType.getByLangName(lang));
@@ -389,7 +393,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 			.testCaseNum(Math.max(1, inputList.size()))
 			.lang(langMap.apply(lang))
 			.build();
-		String jsonString = JSONUtil.toJsonStr(requestArgs);
+		String jsonString = JSON.toJSONString(requestArgs);
 		String jsonFilePath = "request_args.json";
 		FileUtil.writeUtf8String(jsonString, userCodeIsolationDirPath + File.separator + jsonFilePath);
 		// 封装 file_dir.txt
@@ -465,7 +469,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 				dockerCompilProcess.destroy();
 				return message;
 			} catch (IOException | InterruptedException e) {
-				log.error("编译失败", e);
+				throw new BusinessException(StatusEnum.SYSTEM_ERROR, "编译失败. " + e);
 			}
 		}
 		return messageBuild.build();
@@ -479,7 +483,6 @@ public class DockerCodeSandBox implements CodeSandBox {
 	 * @return 运行结果信息
 	 */
 	private static List<Response> codeRun(String containerId, Path codeFileParentDir) {
-		List<Response> messages = new ArrayList<>();
 		/* 启动 execute_core 执行代码 */
 		String[] runCommand = new String[] { "docker", "exec", "-i", containerId, 
           "/execute_core" + File.separator + "execute_core"};
@@ -492,9 +495,9 @@ public class DockerCodeSandBox implements CodeSandBox {
 			if (exitValue == 0) {
 				String normalOutput = ProcessUtil.getProcessOutput(runProcess.getInputStream(), exitValue);
 				normalOutput = Base64.decodeStr(normalOutput);
-				List<Response> exec_resp = JSONUtil.toList(JSONUtil.parseArray(normalOutput), Response.class);
-				// exec_resp.forEach(System.out::println);
-				return exec_resp;
+				List<Response> execResp = JSONArray.parseArray(normalOutput, Response.class);
+				// execResp.forEach(System.out::println);
+				return execResp;
 			}
 			/* execute_core 系统异常 (500 错误) */
 			else {
@@ -507,9 +510,8 @@ public class DockerCodeSandBox implements CodeSandBox {
 				return List.of(response);
 			}
 		} catch (IOException | InterruptedException e) {
-			e.printStackTrace();
+			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "运行失败. " + e);
 		}
-		return messages;
 	}
 	
 	/**

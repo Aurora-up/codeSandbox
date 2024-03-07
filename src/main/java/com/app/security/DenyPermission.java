@@ -1,6 +1,9 @@
 package com.app.security;
 
-@SuppressWarnings({ "removal" })
+/**
+ * java 安全管理器
+ */
+@Deprecated
 public class DenyPermission extends SecurityManager {
 
   /**
