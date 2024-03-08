@@ -37,6 +37,6 @@ public enum LangType {
         return language;
       }
     }
-    throw new BusinessException(StatusEnum.SYSTEM_ERROR, "暂不支持该编程语言");
+    throw new BusinessException(StatusEnum.SYSTEM_NOT_IMPLEMENTED);
   }
 }

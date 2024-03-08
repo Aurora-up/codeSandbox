@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.app.common.BaseHttpResponse;
+import com.app.common.LangType;
 import com.app.common.StatusEnum;
 import com.app.exception.BusinessException;
 import com.app.module.debug.DebugRequest;
@@ -50,6 +51,7 @@ public class CodeExecuteController {
     if (debugRequest.isNull()) { 
       throw new BusinessException(StatusEnum.NULL_ERROR);
     }
+    LangType.getByLangName(debugRequest.getLang());
     DebugResponse debugResponse = codeSandBox.codeDebug(debugRequest);
     return BaseHttpResponse.ok(debugResponse, "调试完成");
   }
@@ -68,6 +70,7 @@ public class CodeExecuteController {
     if (judgeRequest.isNull()) { 
       throw new BusinessException(StatusEnum.NULL_ERROR);
     }
+    LangType.getByLangName(judgeRequest.getLang());
     JudgeResponse judgeResponse = codeSandBox.codeJudge(judgeRequest);
     return BaseHttpResponse.ok(judgeResponse, "评审完成");
   }

@@ -57,7 +57,7 @@ public class CodeLangAdaptUtil {
         codeStoreFileName = PYTHON_CODE_FILE_NAME;
         break;
       default:
-        throw new BusinessException(StatusEnum.SYSTEM_ERROR, "暂不支持该编程语言");
+        throw new BusinessException(StatusEnum.SYSTEM_NOT_IMPLEMENTED);
     }
     return codeStoreFileName;
   }
@@ -101,7 +101,7 @@ public class CodeLangAdaptUtil {
           compileFilePath + File.separator + JAVA_CODE_FILE_NAME);
         break;
       default:
-        throw new BusinessException(StatusEnum.SYSTEM_ERROR, "暂不支持该编程语言");
+        throw new BusinessException(StatusEnum.SYSTEM_NOT_IMPLEMENTED);
     }
     return compileCommand;
   }
