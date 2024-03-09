@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: Online Judge Machine
+
+server:
+  port: 3001

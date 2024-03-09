@@ -39,7 +39,6 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-
 /**
  * @author HDD
  * @date 2024年02月04日
@@ -54,22 +53,23 @@ public class DockerCodeSandBox implements CodeSandBox {
 	/* Docker 编译镜像/容器信息 */
 	private static final String COMPILE_ENV_DOCKER_IMAGE = "compile_env:1.0";
 	private static final String COMPILE_ENV_CONTAINER_NAME = "compile_env";
+
 	private static final String CODE_STORE_ROOT_PATH = "tempCodeRepository";
 	private static final String VOLUMN_CODE_STORE_ROOT_PATH = "/codeStore";
 	/* 测试数据文件前缀 */
 	private static final String INPUT_NAME_PREFIX = "input-";
-	/* 代码调试限制 (相对宽松)  */ 
+	/* 代码调试限制 (相对宽松) */
 	private static final Long TIME_LIMIT = 2000L; // 2s
 	private static final Long Memory_LIMIT = 128 * 1024 * 1024L; // 128MB
 
 	@Autowired
 	DockerUtil dockerUtil;
-	
+
 	/**
 	 * 代码调试
 	 * 
 	 * @param debugRequest 代码调试请求
-	 * @return 代码调试结果 
+	 * @return 代码调试结果
 	 */
 	@Override
 	public DebugResponse codeDebug(DebugRequest debugRequest) {
@@ -86,29 +86,31 @@ public class DockerCodeSandBox implements CodeSandBox {
 
 		/* 1. 代码存储隔离 */
 		Path codeFileParentDir = null;
-		Pair<Path, String> ans  = tackleCodeStorageAndIsolation(code, inputList, lang, TIME_LIMIT, Memory_LIMIT);
+		Pair<Path, String> ans = tackleCodeStorageAndIsolation(code, inputList, lang, TIME_LIMIT, Memory_LIMIT);
 		codeFileParentDir = ans.getKey();
 
 		/* 2. 启动编译容器，代码编译 */
-		String compileContainerId = dockerUtil.getContainerId(codeFileParentDir, COMPILE_ENV_DOCKER_IMAGE, COMPILE_ENV_CONTAINER_NAME, 0);
+		String compileContainerId = dockerUtil.getContainerId(codeFileParentDir.getParent(), COMPILE_ENV_DOCKER_IMAGE,
+				COMPILE_ENV_CONTAINER_NAME, 0);
 		var codeCompileResult = codeCompile(codeFileParentDir.toString(), lang, compileContainerId, ans.getValue());
 
 		// 编译失败 (Compiler Error)
 		if (codeCompileResult.getExitValue() != 0) {
 			/* 代码编译错误输出过滤 */
 			String fixedCompileOutput = OupurFilterUtil.tackleCompileOutput(codeCompileResult.getErrorResult(), lang);
-			codeFileClean(codeFileParentDir.toString());
+			// codeFileClean(codeFileParentDir.toString());
 			return DRBuilder.resultStatus(1001)
 					.resultMessage(Base64.encode(fixedCompileOutput))
 					.build();
 		}
 
 		/* 3. 启动沙箱容器 */
-		String sandBoxContainerId = dockerUtil.getContainerId(codeFileParentDir, SANDBOX_DOCKER_IMAGE, SANDBOX_CONTAINER_NAME, 1);
+		String sandBoxContainerId = dockerUtil.getContainerId(codeFileParentDir.getParent(), SANDBOX_DOCKER_IMAGE,
+				SANDBOX_CONTAINER_NAME, 1);
 
 		/* 4. 代码运行 */
 		var codeRunResults = DockerCodeSandBox.codeRun(sandBoxContainerId, codeFileParentDir);
-		
+
 		var debugResponse = new DebugResponse();
 		Response codeRunResult = new Response();
 		try {
@@ -120,15 +122,9 @@ public class DockerCodeSandBox implements CodeSandBox {
 		String outputMsg = codeRunResult.getOutputMsg();
 		Long time = codeRunResult.getTime();
 		Long memory = codeRunResult.getMemory();
-		/* 判断系统出错 */
-		if (exitCode == 500) {
-			debugResponse = DRBuilder.resultStatus(500)
-															.resultMessage(Base64.encode("Judge System Error"))
-															.build();
-		}
 		/* 越权操作 */
-		else if (exitCode == 1) {
-			debugResponse =  DRBuilder.resultStatus(1)
+		if (exitCode == 1) {
+			debugResponse = DRBuilder.resultStatus(1)
 					.time(codeRunResult.getTime())
 					.memory(codeRunResult.getMemory())
 					.resultMessage(outputMsg)
@@ -137,42 +133,42 @@ public class DockerCodeSandBox implements CodeSandBox {
 		/* 判断系统正常运行 */
 		else if (exitCode == 1000) {
 			debugResponse = DRBuilder.resultStatus(1000)
-						.resultMessage(outputMsg)
-						.time(time)
-						.memory(memory)
-						.build();
+					.resultMessage(outputMsg)
+					.time(time)
+					.memory(memory)
+					.build();
 		}
 		/* 运行时错误 RE */
 		else if (exitCode == 1002) {
 			debugResponse = DRBuilder.resultStatus(1002)
-						.resultMessage(outputMsg)
-						.time(time)
-						.memory(memory)
-						.build();
+					.resultMessage(outputMsg)
+					.time(time)
+					.memory(memory)
+					.build();
 		}
 		/* 运行超时 TLE */
 		else if (exitCode == 1003) {
 			debugResponse = DRBuilder.resultStatus(1003)
-						.resultMessage(outputMsg)
-						.time(-1L)
-						.memory(memory)
-						.build();
+					.resultMessage(outputMsg)
+					.time(-1L)
+					.memory(memory)
+					.build();
 		}
 		/* 运行占用内存超出限制 MLE */
 		else if (exitCode == 1004) {
 			debugResponse = DRBuilder.resultStatus(1004)
-						.resultMessage(outputMsg)
-						.time(time)
-						.memory(-1L)
-						.build();
+					.resultMessage(outputMsg)
+					.time(time)
+					.memory(-1L)
+					.build();
 		}
 		/* 未知错误 */
 		else {
 			debugResponse = DRBuilder.resultStatus(777)
-						.resultMessage(Base64.encode("未知错误: ") + outputMsg)
-						.time(time)
-						.memory(memory)
-						.build();
+					.resultMessage(Base64.encode("未知错误: ") + outputMsg)
+					.time(time)
+					.memory(memory)
+					.build();
 		}
 		codeFileClean(codeFileParentDir.toString());
 		return debugResponse;
@@ -197,11 +193,12 @@ public class DockerCodeSandBox implements CodeSandBox {
 
 		/* 1. 代码存储隔离 */
 		Path codeFileParentDir = null;
-		Pair<Path, String> ans  = tackleCodeStorageAndIsolation(code, inputList, lang, timeLimit, memoryLimit);
+		Pair<Path, String> ans = tackleCodeStorageAndIsolation(code, inputList, lang, timeLimit, memoryLimit);
 		codeFileParentDir = ans.getKey();
 
 		/* 2. 启动编译容器，代码编译 */
-		String compileContainerId = dockerUtil.getContainerId(codeFileParentDir, COMPILE_ENV_DOCKER_IMAGE, COMPILE_ENV_CONTAINER_NAME, 0);
+		String compileContainerId = dockerUtil.getContainerId(codeFileParentDir.getParent(), COMPILE_ENV_DOCKER_IMAGE,
+				COMPILE_ENV_CONTAINER_NAME, 0);
 		var codeCompileResult = codeCompile(codeFileParentDir.toString(), lang, compileContainerId, ans.getValue());
 		// 编译失败 (Compiler Error)
 		if (codeCompileResult.getExitValue() != 0) {
@@ -218,134 +215,129 @@ public class DockerCodeSandBox implements CodeSandBox {
 		judgeRequest.getTestCases().forEach(testCase -> mp.put(testCase.getId(), testCase.getCorrectResult()));
 
 		/* 3. 启动沙箱容器 */
-		String sandBoxContainerId = dockerUtil.getContainerId(codeFileParentDir, SANDBOX_DOCKER_IMAGE, SANDBOX_CONTAINER_NAME, 1);
+		String sandBoxContainerId = dockerUtil.getContainerId(codeFileParentDir.getParent(), SANDBOX_DOCKER_IMAGE,
+				SANDBOX_CONTAINER_NAME, 1);
 
 		/* 4. 代码运行 */
 		var codeRunResults = DockerCodeSandBox.codeRun(sandBoxContainerId, codeFileParentDir);
 		var judgeResponse = new JudgeResponse();
-		var codeRunResultFirst = new Response();
 		try {
-			codeRunResultFirst = codeRunResults.get(0);
+			codeRunResults.get(0);
 		} catch (IndexOutOfBoundsException e) {
 			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "代码运行结果返回为空, 导致在 codeRun 中出现结果数组访问越界异常. " + e);
 		}
-		/* 判题系统出错 */
-		if (codeRunResultFirst.getExitCode() == 500) {
-			judgeResponse = JRBuilder.resultStatus(500)
-															.resultMessage(Base64.encode("Judge System Error"))
-															.build();
-		}
+
 		/* 判题系统正常运行 */
-		else {
-			Integer passTestCasesNumber = 0;
-			Comparator<Response> testCaseIdComparator = Comparator.comparing(Response::getTestCaseId, Comparator.naturalOrder());
-			codeRunResults.sort(testCaseIdComparator);
-			Long time = 0L;
-			Long memory = 0L;
-			for (var response : codeRunResults) {
-				Integer exitCode = response.getExitCode();
-				Integer testCaseId = response.getTestCaseId();
-				String outputMsg = response.getOutputMsg();
-				/* 代码正常执行 */
-				if (exitCode == 1000) {
-					// 定义匹配由空格、换行符或制表符隔开的内容的正则表达式
-					String regex = "\\s+";
-					Pattern pattern = Pattern.compile(regex);
-					String[] fixOutputMsg = pattern.split(Base64.decodeStr(outputMsg));
-					// 当前数据通过
-					if (Base64.decodeStr(outputMsg).equals(mp.get(testCaseId))) {
-						passTestCasesNumber ++;
-						time += response.getTime();  // 时间累加
-						memory = Math.max(memory, response.getMemory()); // 内存使用峰值内存
-					}
-					// 输出格式错误 PE
-					else if (ArrayUtil.equals(fixOutputMsg, pattern.split(mp.get(testCaseId)))) {
-						judgeResponse = JRBuilder.resultStatus(1006)
-																		.passTestCasesNumber(passTestCasesNumber)
-																		.noPassTestCaseId(response.getTestCaseId())
-																		.time(response.getTime())
-																		.memory(response.getMemory())
-																		.resultMessage(Base64.encode("Presentation Error"))
-																		.build();
-						break;
-					}
-					// 错误答案 WA
-					else {
-						judgeResponse = JRBuilder.resultStatus(1005)
-																		.passTestCasesNumber(passTestCasesNumber)
-																		.noPassTestCaseId(response.getTestCaseId())
-																		.time(response.getTime())
-																		.memory(response.getMemory())
-																		.resultMessage(Base64.encode("Wrong Answer"))
-																		.build();
-						break;		
-					}
+		Integer passTestCasesNumber = 0;
+		Comparator<Response> testCaseIdComparator = Comparator.comparing(Response::getTestCaseId,
+				Comparator.naturalOrder());
+		codeRunResults.sort(testCaseIdComparator);
+		Long time = 0L;
+		Long memory = 0L;
+		for (var response : codeRunResults) {
+			Integer exitCode = response.getExitCode();
+			Integer testCaseId = response.getTestCaseId();
+			String outputMsg = response.getOutputMsg();
+			/* 代码正常执行 */
+			if (exitCode == 1000) {
+				// 定义匹配由空格、换行符或制表符隔开的内容的正则表达式
+				String regex = "\\s+";
+				Pattern pattern = Pattern.compile(regex);
+				String[] fixOutputMsg = pattern.split(Base64.decodeStr(outputMsg));
+				// 当前数据通过
+				if (Base64.decodeStr(outputMsg).equals(mp.get(testCaseId))) {
+					passTestCasesNumber++;
+					time += response.getTime(); // 时间累加
+					memory = Math.max(memory, response.getMemory()); // 内存使用峰值内存
 				}
-				/* 运行时错误 RE */
-				else if (exitCode == 1002) {
-					judgeResponse = JRBuilder.resultStatus(1002)
-																	.passTestCasesNumber(passTestCasesNumber)
-																	.noPassTestCaseId(response.getTestCaseId())
-																	.resultMessage(Base64.encode(outputMsg))
-																	.build();
+				// 输出格式错误 PE
+				else if (ArrayUtil.equals(fixOutputMsg, pattern.split(mp.get(testCaseId)))) {
+					judgeResponse = JRBuilder.resultStatus(1006)
+							.passTestCasesNumber(passTestCasesNumber)
+							.noPassTestCaseId(response.getTestCaseId())
+							.time(response.getTime())
+							.memory(response.getMemory())
+							.resultMessage(Base64.encode("Presentation Error"))
+							.build();
 					break;
 				}
-				/* 运行超时 TLE */
-				else if (exitCode == 1003) {
-					judgeResponse = JRBuilder.resultStatus(1003)
-																	.passTestCasesNumber(passTestCasesNumber)
-																	.noPassTestCaseId(response.getTestCaseId())
-																	.time(-1L)
-																	.memory(response.getMemory())
-																	.resultMessage(Base64.encode("Time Limit Exceeded"))
-																	.build();
-					break;
-				}
-				/* 运行时占用内存超出限制 MLE */
-				else if (exitCode == 1004) {
-					judgeResponse = JRBuilder.resultStatus(1004)
-																	.passTestCasesNumber(passTestCasesNumber)
-																	.noPassTestCaseId(response.getTestCaseId())
-																	.time(response.getTime())
-																	.memory(-1L)
-																	.resultMessage(Base64.encode("Memory Limit Exceeded"))
-																	.build();
-					break;
-				}
-				/* 越权操作 */
-				else if (exitCode == 1) {
-					judgeResponse = JRBuilder.resultStatus(1)
-																	.passTestCasesNumber(passTestCasesNumber)
-																	.noPassTestCaseId(response.getTestCaseId())
-																	.time(response.getTime())
-																	.memory(response.getMemory())
-																	.resultMessage(Base64.encode("Permission Deny: " + outputMsg))
-																	.build();
-					break;
-				}
-				/* 未知错误 */
+				// 错误答案 WA
 				else {
-					judgeResponse = JRBuilder.resultStatus(777)
-																	.passTestCasesNumber(passTestCasesNumber)
-																	.noPassTestCaseId(response.getTestCaseId())
-																	.resultMessage(Base64.encode("Unknown Error: ") + outputMsg)
-																	.time(response.getTime())
-																	.memory(response.getMemory())
-																	.build();
+					judgeResponse = JRBuilder.resultStatus(1005)
+							.passTestCasesNumber(passTestCasesNumber)
+							.noPassTestCaseId(response.getTestCaseId())
+							.time(response.getTime())
+							.memory(response.getMemory())
+							.resultMessage(Base64.encode("Wrong Answer"))
+							.build();
 					break;
 				}
 			}
-			/* AC */
-			if (passTestCasesNumber == codeRunResults.size()) {
-				judgeResponse = JRBuilder.resultStatus(1000)
-													.passTestCasesNumber(passTestCasesNumber)
-													.noPassTestCaseId(0)
-													.resultMessage(Base64.encode("Accepted"))
-													.time(time)
-													.memory(memory)
-													.build();
+			/* 运行时错误 RE */
+			else if (exitCode == 1002) {
+				judgeResponse = JRBuilder.resultStatus(1002)
+						.passTestCasesNumber(passTestCasesNumber)
+						.noPassTestCaseId(response.getTestCaseId())
+						.resultMessage(Base64.encode(outputMsg))
+						.build();
+				break;
+			}
+			/* 运行超时 TLE */
+			else if (exitCode == 1003) {
+				judgeResponse = JRBuilder.resultStatus(1003)
+						.passTestCasesNumber(passTestCasesNumber)
+						.noPassTestCaseId(response.getTestCaseId())
+						.time(-1L)
+						.memory(response.getMemory())
+						.resultMessage(Base64.encode("Time Limit Exceeded"))
+						.build();
+				break;
+			}
+			/* 运行时占用内存超出限制 MLE */
+			else if (exitCode == 1004) {
+				judgeResponse = JRBuilder.resultStatus(1004)
+						.passTestCasesNumber(passTestCasesNumber)
+						.noPassTestCaseId(response.getTestCaseId())
+						.time(response.getTime())
+						.memory(-1L)
+						.resultMessage(Base64.encode("Memory Limit Exceeded"))
+						.build();
+				break;
+			}
+			/* 越权操作 */
+			else if (exitCode == 1) {
+				judgeResponse = JRBuilder.resultStatus(1)
+						.passTestCasesNumber(passTestCasesNumber)
+						.noPassTestCaseId(response.getTestCaseId())
+						.time(response.getTime())
+						.memory(response.getMemory())
+						.resultMessage(Base64.encode("Permission Deny: " + outputMsg))
+						.build();
+				break;
+			}
+			/* 未知错误 */
+			else {
+				judgeResponse = JRBuilder.resultStatus(777)
+						.passTestCasesNumber(passTestCasesNumber)
+						.noPassTestCaseId(response.getTestCaseId())
+						.resultMessage(Base64.encode("Unknown Error: ") + outputMsg)
+						.time(response.getTime())
+						.memory(response.getMemory())
+						.build();
+				break;
 			}
 		}
+		/* AC */
+		if (passTestCasesNumber == codeRunResults.size()) {
+			judgeResponse = JRBuilder.resultStatus(1000)
+					.passTestCasesNumber(passTestCasesNumber)
+					.noPassTestCaseId(0)
+					.resultMessage(Base64.encode("Accepted"))
+					.time(time)
+					.memory(memory)
+					.build();
+		}
+
 		codeFileClean(codeFileParentDir.toString());
 		return judgeResponse;
 	}
@@ -353,14 +345,15 @@ public class DockerCodeSandBox implements CodeSandBox {
 	/**
 	 * 处理用户代码的存储隔离
 	 *
-	 * @param code 用户提交的代码
-	 * @param inputList 输入列表
-	 * @param lang 编程语言
-	 * @param timieLimit 时间限制
+	 * @param code        用户提交的代码
+	 * @param inputList   输入列表
+	 * @param lang        编程语言
+	 * @param timieLimit  时间限制
 	 * @param memoryLimit 内存限制
 	 * @return <用户提交代码存放的目录, 隔离目录名>
 	 */
-	private static Pair<Path, String> tackleCodeStorageAndIsolation(String code, List<String> inputList, String lang, Long timieLimit, Long memoryLimit) {
+	private static Pair<Path, String> tackleCodeStorageAndIsolation(String code, List<String> inputList, String lang,
+			Long timieLimit, Long memoryLimit) {
 		/* 1. 创建代码存放的 "根目录" 的绝对路径 */
 		String projectDirPath = System.getProperty("user.dir");
 		String codeStoreRootPath = projectDirPath + File.separator + CODE_STORE_ROOT_PATH;
@@ -381,43 +374,49 @@ public class DockerCodeSandBox implements CodeSandBox {
 		}
 		// 封装 执行请求的 json 文件
 		Function<String, Integer> langMap = (String langType) -> {
-			if (langType.equals("java")) return 2;
-			else if (langType.equals("python")) return 3;
-			else return 1;
+			if (langType.equals("java"))
+				return 2;
+			else if (langType.equals("python"))
+				return 3;
+			else
+				return 1;
 		};
 		var requestArgsbuilder = RequestArgs.builder();
 		var requestArgs = requestArgsbuilder
-			.timeLimit(timieLimit)
-			.memoryLimit(memoryLimit)
-			.fileDir(VOLUMN_CODE_STORE_ROOT_PATH + File.separator + isolcationDirName + File.separator)
-			.testCaseNum(Math.max(1, inputList.size()))
-			.lang(langMap.apply(lang))
-			.build();
+				.timeLimit(timieLimit)
+				.memoryLimit(memoryLimit)
+				.fileDir(VOLUMN_CODE_STORE_ROOT_PATH + File.separator + isolcationDirName + File.separator)
+				.testCaseNum(Math.max(1, inputList.size()))
+				.lang(langMap.apply(lang))
+				.build();
 		String jsonString = JSON.toJSONString(requestArgs);
 		String jsonFilePath = "request_args.json";
 		FileUtil.writeUtf8String(jsonString, userCodeIsolationDirPath + File.separator + jsonFilePath);
 		// 封装 file_dir.txt
 		FileUtil.writeString(VOLUMN_CODE_STORE_ROOT_PATH + File.separator + isolcationDirName + File.separator,
-												 userCodeIsolationDirPath + File.separator + "file-dir.txt", StandardCharsets.UTF_8);
+				userCodeIsolationDirPath + File.separator + "file-dir.txt", StandardCharsets.UTF_8);
 		/* 返回用户提交的代码文件所在的目录 */
-		return new Pair<Path,String>(Paths.get(userCodeFile.getParentFile().getAbsolutePath()), isolcationDirName);
+		return new Pair<Path, String>(Paths.get(userCodeFile.getParentFile().getAbsolutePath()), isolcationDirName);
 	}
 
 	/**
 	 * cpp / c / rust / java 代码编译 (python 不需要编译)
 	 * 
 	 * @param codeFileParentDir java 代码存储路径 (本机)
-	 * @param lang 语言
-	 * @param containerId 编译容器 Id
+	 * @param lang              语言
+	 * @param containerId       编译容器 Id
 	 * @param isolcationDirName c, cpp, rust 代码存储路径 (编译容器)
 	 * @return
 	 */
-	private static ProcessExecuteResult codeCompile(String codeFileParentDir, String lang, String containerId, String isolcationDirName) {
+	private static ProcessExecuteResult codeCompile(String codeFileParentDir, String lang, String containerId,
+			String isolcationDirName) {
 		var messageBuild = ProcessExecuteResult.builder();
-		String[] compileCommand = new String[]{};
+		String[] compileCommand = new String[] {};
 		// python 不需要编译
-		if (lang.equals("python")) return messageBuild.exitValue(0).build();
-		if (!lang.equals("java")) codeFileParentDir = VOLUMN_CODE_STORE_ROOT_PATH + File.separator + isolcationDirName;
+		if (lang.equals("python"))
+			return messageBuild.exitValue(0).build();
+		if (!lang.equals("java"))
+			codeFileParentDir = VOLUMN_CODE_STORE_ROOT_PATH + File.separator + isolcationDirName;
 		/* 匹配对应编程语言的编译命令 */
 		compileCommand = CodeLangAdaptUtil.codeCompileCommandArgsAdapt(LangType.getByLangName(lang), codeFileParentDir);
 		/* java 在本地编译即可 */
@@ -430,14 +429,14 @@ public class DockerCodeSandBox implements CodeSandBox {
 				/* 编译成功 */
 				if (exitValue == 0) {
 					message = messageBuild.exitValue(0)
-						.normalResult(ProcessUtil.getProcessOutput(compileProcess.getInputStream(), exitValue))
-						.build();
+							.normalResult(ProcessUtil.getProcessOutput(compileProcess.getInputStream(), exitValue))
+							.build();
 				}
 				/* 编译失败 */
 				else {
 					message = messageBuild.exitValue(1001)
-						.errorResult(ProcessUtil.getProcessOutput(compileProcess.getErrorStream(), exitValue))
-						.build();
+							.errorResult(ProcessUtil.getProcessOutput(compileProcess.getErrorStream(), exitValue))
+							.build();
 				}
 				compileProcess.destroy();
 				return message;
@@ -447,7 +446,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		}
 		/* c, cpp, rust 在专有镜像中编译 */
 		else {
-			String[] compileCommandPrefix = new String[] {"docker", "exec", "-i", containerId };
+			String[] compileCommandPrefix = new String[] { "docker", "exec", "-i", containerId };
 			var processBuilder = new ProcessBuilder(ArrayUtil.append(compileCommandPrefix, compileCommand));
 			Process dockerCompilProcess;
 			try {
@@ -457,14 +456,14 @@ public class DockerCodeSandBox implements CodeSandBox {
 				/* 编译成功 */
 				if (exitValue == 0) {
 					message = messageBuild.exitValue(0)
-						.normalResult(ProcessUtil.getProcessOutput(dockerCompilProcess.getInputStream(), exitValue))
-						.build();
+							.normalResult(ProcessUtil.getProcessOutput(dockerCompilProcess.getInputStream(), exitValue))
+							.build();
 				}
 				/* 编译失败 */
 				else {
 					message = messageBuild.exitValue(1001)
-						.errorResult(ProcessUtil.getProcessOutput(dockerCompilProcess.getErrorStream(), exitValue))
-						.build();
+							.errorResult(ProcessUtil.getProcessOutput(dockerCompilProcess.getErrorStream(), exitValue))
+							.build();
 				}
 				dockerCompilProcess.destroy();
 				return message;
@@ -484,14 +483,14 @@ public class DockerCodeSandBox implements CodeSandBox {
 	 */
 	private static List<Response> codeRun(String containerId, Path codeFileParentDir) {
 		/* 启动 execute_core 执行代码 */
-		String[] runCommand = new String[] { "docker", "exec", "-i", containerId, 
-          "/execute_core" + File.separator + "execute_core"};
+		String[] runCommand = new String[] { "docker", "exec", "-i", containerId,
+				"/execute_core" + File.separator + "execute_core" };
 		var processBuilder = new ProcessBuilder(runCommand);
 		processBuilder.redirectInput(new File(codeFileParentDir + File.separator + "file-dir.txt"));
 		try {
 			Process runProcess = processBuilder.start();
 			int exitValue = runProcess.waitFor();
-			/* execute_core 正常运行 */ 
+			/* execute_core 正常运行 */
 			if (exitValue == 0) {
 				String normalOutput = ProcessUtil.getProcessOutput(runProcess.getInputStream(), exitValue);
 				normalOutput = Base64.decodeStr(normalOutput);
@@ -503,17 +502,17 @@ public class DockerCodeSandBox implements CodeSandBox {
 			else {
 				String errorOutput = ProcessUtil.getProcessOutput(runProcess.getErrorStream(), exitValue);
 				var RSBuilder = Response.builder();
-				var response = RSBuilder.exitCode(500)
-								 .outputMsg(errorOutput)
-								 .build();
+				RSBuilder.exitCode(500)
+						.outputMsg(errorOutput)
+						.build();
 				log.info("execute_core 出错: \n" + errorOutput);
-				return List.of(response);
+				throw new BusinessException(StatusEnum.SYSTEM_ERROR, errorOutput);
 			}
 		} catch (IOException | InterruptedException e) {
 			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "运行失败. " + e);
 		}
 	}
-	
+
 	/**
 	 * 编译 java 代码的权限校验文件
 	 * 

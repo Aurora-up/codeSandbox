@@ -111,10 +111,10 @@ public class DockerUtil {
 	private static String createContainer(Path codeFileParentDir, String imageName, String containerName, Integer flag) {
 		var containerCmd = dockerClient.createContainerCmd(imageName).withName(containerName);
 		var hostConfig = new HostConfig();
-		log.info("挂载目录:" + codeFileParentDir.getParent().toString());
+		log.info("挂载目录:" + codeFileParentDir.toString());
 		
 		hostConfig.setBinds(
-			new Bind(codeFileParentDir.getParent().toString(), new Volume("/codeStore"))
+			new Bind(codeFileParentDir.toString(), new Volume("/codeStore"))
 		);
 		hostConfig.withMemory(256 * 1024 * 1024L);
 		hostConfig.withCpuCount(1L);
