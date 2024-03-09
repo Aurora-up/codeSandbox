@@ -75,6 +75,8 @@ public class DockerUtil {
     if (flag.equals(0)) DockerfilePath = new File(projectDirPath + File.separator + "compile_env" + File.separator  + "Dockerfile");
     else DockerfilePath = new File(projectDirPath + File.separator + "Dockerfile");
 
+		System.out.println("Dockerfile 文件路径： " + DockerfilePath);
+
 		BuildImageCmd buildImageCmd = dockerClient.buildImageCmd(DockerfilePath);
 		Set<String> name = new HashSet<String>();
 		name.add(imageName);

@@ -26,7 +26,9 @@ sudo groupadd docker
 cat /etc/group | grep 'docker'
 
 # 将当前登录用户添加到 docker 用户组
-sudo gpasswd -a ${USER}
+ sudo usermod -aG docker ${USER}
+
+sudo chmod 666 /var/run/docker.sock
 
 # 刷新用户组信息
 newgrp docker

@@ -1,7 +1,8 @@
 package com.app.controller;
 
 
-import org.springframework.beans.factory.annotation.Autowired;
+import javax.annotation.Resource;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,7 +18,6 @@ import com.app.module.debug.DebugResponse;
 import com.app.module.judge.JudgeRequest;
 import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
-import com.app.service.impl.DockerCodeSandBox;
 
 import reactor.core.publisher.Mono;
 
@@ -29,13 +29,8 @@ import reactor.core.publisher.Mono;
 @RestController
 public class CodeExecuteController {
 
-  public final CodeSandBox codeSandBox;
-
-  @Autowired
-  public CodeExecuteController(DockerCodeSandBox dockerCodeSandBox) {
-    this.codeSandBox = dockerCodeSandBox;
-  }
-
+  @Resource
+  public CodeSandBox codeSandBox;
   /**
    * 评测机调试接口
    * @param debugRequest 调试请求
