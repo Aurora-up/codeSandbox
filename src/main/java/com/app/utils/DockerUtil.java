@@ -15,6 +15,7 @@ import com.app.common.StatusEnum;
 import com.app.exception.BusinessException;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.BuildImageCmd;
+import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.BuildResponseItem;
 import com.github.dockerjava.api.model.Container;
@@ -95,7 +96,7 @@ public class DockerUtil {
 			if (flag.equals(0)) log.info("编译环境创建成功");
 			else 	log.info("代码沙箱创建成功");
 		} catch (InterruptedException e) {
-			if (flag.equals(0)) throw new BusinessException(StatusEnum.SYSTEM_ERROR, "编译环境镜像失败" + e);
+			if (flag.equals(0)) throw new BusinessException(StatusEnum.SYSTEM_ERROR, "创建编译环境镜像失败" + e);
 			else throw new BusinessException(StatusEnum.SYSTEM_ERROR, "创建代码沙箱环境镜像失败" + e);
 		}
 	}
@@ -120,8 +121,10 @@ public class DockerUtil {
 		hostConfig.withCpuCount(1L);
 		
 		// 编译环境
-		if (flag.equals(0)) {			
-			var containerInstance = containerCmd
+		if (flag.equals(0)) {		
+			CreateContainerResponse containerInstance = null;	
+			try {
+				containerInstance = containerCmd
 					.withReadonlyRootfs(true)
 					.withHostConfig(hostConfig)
 					.withNetworkDisabled(true)
@@ -130,6 +133,9 @@ public class DockerUtil {
 					.withAttachStderr(true)
 					.withTty(true)
 					.exec();
+			} catch (Exception e) {
+				throw new BusinessException(StatusEnum.SYSTEM_ERROR, "编译容器创建失败" + e);
+			}
 			return containerInstance.getId();
 		}
 		// 运行环境
@@ -143,8 +149,9 @@ public class DockerUtil {
 				throw new BusinessException(StatusEnum.SYSTEM_ERROR, "无法读取到 seccomp 安全配置文件" + e);
 			}
 			hostConfig.withSecurityOpts(List.of("seccomp=" + seccompProfile));
-			
-			var containerInstance = containerCmd
+			CreateContainerResponse containerInstance = null;
+			try {
+				containerInstance = containerCmd
 					.withReadonlyRootfs(true)
 					.withHostConfig(hostConfig)
 					.withNetworkDisabled(true)
@@ -153,6 +160,9 @@ public class DockerUtil {
 					.withAttachStderr(true)
 					.withTty(true)
 					.exec();
+			} catch (Exception e) {
+				throw new BusinessException(StatusEnum.SYSTEM_ERROR, "沙箱容器创建失败" + e);
+			}
 			return containerInstance.getId();
 		}
 	}
@@ -184,7 +194,16 @@ public class DockerUtil {
     // 并启动容器
     var containerInfo = dockerClient.inspectContainerCmd(containerId).exec();
 		if (Boolean.FALSE.equals(containerInfo.getState().getRunning())) {
-			dockerClient.startContainerCmd(containerId).exec();
+			try {
+				dockerClient.startContainerCmd(containerId).exec();
+			} catch (Exception e) {
+				if (flag.equals(0)) {
+					throw new BusinessException(StatusEnum.SYSTEM_ERROR, "编译容器启动失败" + e);
+				}	
+				else {
+					throw new BusinessException(StatusEnum.SYSTEM_ERROR, "沙箱容器启动失败" + e);
+				}
+			}
 		}
 		return containerId;
 	}

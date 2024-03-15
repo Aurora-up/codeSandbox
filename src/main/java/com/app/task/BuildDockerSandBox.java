@@ -1,4 +1,4 @@
-package com.app.job;
+package com.app.task;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -14,7 +14,7 @@ import com.app.utils.DockerUtil;
 /**
  * @author HDD
  * @date 2024年02月04日
- * @description 单次任务 —— 构建编译镜像和代码沙箱镜像
+ * @description 单次任务 —— 构建编译镜像和代码沙箱镜像并启动相关容器
  */
 @Component
 public class BuildDockerSandBox implements ApplicationRunner{

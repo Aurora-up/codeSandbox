@@ -1,12 +1,8 @@
 ## CodeSandBox
-环境准备:
-1. jdk17, g++, gcc, rust, docker
-
+### 环境准备:
+1. jdk17, docker
 ```sh
 sudo apt update
-
-# gcc, g++ 环境
-sudo apt install build-essential
 
 # jdk17 环境
 sudo apt install openjdk-17-jdk
@@ -26,16 +22,11 @@ sudo groupadd docker
 cat /etc/group | grep 'docker'
 
 # 将当前登录用户添加到 docker 用户组
- sudo usermod -aG docker ${USER}
-
-sudo chmod 666 /var/run/docker.sock
+sudo usermod -aG docker ${USER}
 
 # 刷新用户组信息
 newgrp docker
-```
-3. 运行 Dockerfile 文件, 创建隔离的沙箱环境
-```sh
-cd /home/<user_name>/codeSandBox
 
-docker build -t sandbox:2.0 .
+# 开启 Docker Client 的连接权限
+sudo chmod 666 /var/run/docker.sock
 ```
