@@ -1,6 +1,10 @@
 package com.app.controller;
 
 
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 import javax.annotation.Resource;
 
 import org.springframework.http.HttpHeaders;
@@ -20,6 +24,7 @@ import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
 
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * @author HDD
@@ -31,6 +36,12 @@ public class CodeExecuteController {
 
   @Resource
   public CodeSandBox codeSandBox;
+
+  private static final ThreadPoolExecutor debugPoolExecutor = new ThreadPoolExecutor(10, 10, 1, TimeUnit.MINUTES,
+            new LinkedBlockingQueue<>(10));
+  
+  private static final ThreadPoolExecutor judgePoolExecutor = new ThreadPoolExecutor(10, 10, 1, TimeUnit.MINUTES,
+            new LinkedBlockingQueue<>(10));
   /**
    * 评测机调试接口
    * @param debugRequest 调试请求
@@ -48,7 +59,8 @@ public class CodeExecuteController {
     }
     LangType.getByLangName(debugRequest.getLang());
     DebugResponse debugResponse = codeSandBox.codeDebug(debugRequest);
-    return BaseHttpResponse.ok(debugResponse, "调试完成");
+    return BaseHttpResponse.ok(debugResponse, "调试完成")
+                           .publishOn(Schedulers.fromExecutor(debugPoolExecutor));
   }
   /**
    * 评测机评审接口
@@ -67,6 +79,7 @@ public class CodeExecuteController {
     }
     LangType.getByLangName(judgeRequest.getLang());
     JudgeResponse judgeResponse = codeSandBox.codeJudge(judgeRequest);
-    return BaseHttpResponse.ok(judgeResponse, "评审完成");
+    return BaseHttpResponse.ok(judgeResponse, "评审完成")
+                            .publishOn(Schedulers.fromExecutor(judgePoolExecutor));
   }
 }

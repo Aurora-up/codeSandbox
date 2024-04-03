@@ -1,5 +1,7 @@
 package com.app.common;
 
+import java.util.Arrays;
+
 import com.app.exception.BusinessException;
 
 /**
@@ -19,7 +21,7 @@ public enum LangType {
   JAVA("java"),
   /* 解释型语言 */
   PYTHON("python");
-  
+
   private final String langName;
 
   LangType(String langName) {
@@ -32,11 +34,16 @@ public enum LangType {
 
   // 通过语言名称获取对应的枚举值
   public static LangType getByLangName(String langName) {
-    for (LangType language : values()) {
-      if (language.getLangName().equalsIgnoreCase(langName)) {
-        return language;
-      }
-    }
-    throw new BusinessException(StatusEnum.SYSTEM_NOT_IMPLEMENTED);
+    return Arrays.stream(LangType.values())
+                  .filter(e -> {
+                    if (e.getLangName().equalsIgnoreCase(langName)) {
+                      return true;
+                    }
+                    return false;
+                  })
+                  .findFirst()
+                  .orElseThrow(() -> {
+                    throw new BusinessException(StatusEnum.SYSTEM_NOT_IMPLEMENTED);
+                  });
   }
 }
