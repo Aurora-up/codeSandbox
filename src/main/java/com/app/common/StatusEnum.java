@@ -1,5 +1,9 @@
 package com.app.common;
 
+import java.util.Arrays;
+
+import com.app.exception.BusinessException;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -32,4 +36,25 @@ public enum StatusEnum {
    * 状态码信息（详情）
    */
   private final String description;
+
+  /**
+   * 根据状态吗获取状态码信息
+   * 
+   * @param statusCode 状态码
+   */
+  public static String getMessageByStatusCode(int statusCode) {
+    return Arrays.stream(StatusEnum.values())
+                .filter(e -> {
+                  if (e.getStatusCode() == statusCode) {
+                    return true;
+                  }
+                  return false;
+                })
+                .findFirst()
+                .orElseThrow(() -> {
+                  throw new BusinessException(StatusEnum.SYSTEM_NOT_IMPLEMENTED);
+                })
+                .getMessage();
+  }
+
 }

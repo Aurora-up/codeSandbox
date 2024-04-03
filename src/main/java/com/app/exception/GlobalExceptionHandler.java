@@ -23,7 +23,7 @@ public class GlobalExceptionHandler {
    * @return
    */
   @ExceptionHandler(BusinessException.class)
-  public Mono<BaseHttpResponse> businessExceptionHandler(BusinessException e) {
+  public Mono<BaseHttpResponse<BusinessException>> businessExceptionHandler(BusinessException e) {
     log.error("接口请求出现异常: " + e.getMessage());
     return BaseHttpResponse.error(e);
   }
@@ -34,12 +34,8 @@ public class GlobalExceptionHandler {
    * @return
    */
   @ExceptionHandler(RuntimeException.class)
-  public Mono<BaseHttpResponse> runtimeExceptionHandler(RuntimeException e) {
+  public Mono<BaseHttpResponse<RuntimeException>> runtimeExceptionHandler(RuntimeException e) {
     log.error("系统内部出现未知异常" + e.getMessage());
-    var builder = BusinessException.builder();
-    var businessException = builder.statusCode(StatusEnum.SYSTEM_ERROR.getStatusCode())
-           .description(e.getMessage())
-           .build();
-    return BaseHttpResponse.error(businessException);
+    return BaseHttpResponse.error(e);
   }
 }

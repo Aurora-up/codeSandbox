@@ -19,7 +19,7 @@ import reactor.core.publisher.Mono;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BaseHttpResponse implements Serializable {
+public class BaseHttpResponse<T> implements Serializable {
 
   /**
    * 响应状态码
@@ -34,7 +34,7 @@ public class BaseHttpResponse implements Serializable {
   /**
    * 响应数据
    */
-  private Object data;
+  private T data;
 
   /**
    * 状态码信息 (详细)
@@ -42,32 +42,55 @@ public class BaseHttpResponse implements Serializable {
   private String description;
 
   /**
+   * 时间戳
+   */
+  private Long timestamp;
+
+  /**
    * 封装响应成功的请求
    * @param data 响应数据
    * @param description 详细描述
    * @return
    */
-  public static Mono<BaseHttpResponse> ok(Object data, String description) {
-    var builder = new BaseHttpResponseBuilder();
+  public static <T> Mono<BaseHttpResponse<T>> ok(T data, String description) {
+    var builder = new BaseHttpResponseBuilder<T>();
     var resp = builder.statusCode(StatusEnum.SUCCESS.getStatusCode())
                   .data(data)
                   .message(StatusEnum.SUCCESS.getMessage())
                   .description(description)
+                  .timestamp(System.currentTimeMillis())
                   .build();
     return Mono.just(resp);
   }
 
   /**
-   * 封装响应失败的请求
+   * 封装响应失败的请求 -- 已定义异常
    * @param errorStatu 错误状态
    * @param description 错误描述
    * @return
    */
-  public static Mono<BaseHttpResponse> error(BusinessException e) {
-    var builder = new BaseHttpResponseBuilder();
+  public static Mono<BaseHttpResponse<BusinessException>> error(BusinessException e) {
+    var builder = new BaseHttpResponseBuilder<BusinessException>();
     var resp = builder.statusCode(e.getStatusCode())
-                  .message(e.getMessage())
+                  .message(StatusEnum.getMessageByStatusCode(e.getStatusCode()))
                   .description(e.getDescription())
+                  .timestamp(System.currentTimeMillis())
+                  .build();
+    return Mono.just(resp);
+  }
+
+    /**
+   * 封装响应失败的请求 -- 系统内部未知异常
+   * @param errorStatu 错误状态
+   * @param description 错误描述
+   * @return
+   */
+  public static Mono<BaseHttpResponse<RuntimeException>> error(RuntimeException e) {
+    var builder = new BaseHttpResponseBuilder<RuntimeException>();
+    var resp = builder.statusCode(StatusEnum.SYSTEM_ERROR.getStatusCode())
+                  .message(StatusEnum.SYSTEM_ERROR.getMessage())
+                  .description(e.getMessage())
+                  .timestamp(System.currentTimeMillis())
                   .build();
     return Mono.just(resp);
   }

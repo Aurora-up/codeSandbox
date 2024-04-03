@@ -48,7 +48,7 @@ public class CodeExecuteController {
    * @return 调试结果
    */
   @PostMapping("/debug")
-  public Mono<BaseHttpResponse> codeDebug(@RequestBody DebugRequest debugRequest, ServerHttpRequest sHttpRequest) {
+  public Mono<BaseHttpResponse<DebugResponse>> codeDebug(@RequestBody DebugRequest debugRequest, ServerHttpRequest sHttpRequest) {
     HttpHeaders headers = sHttpRequest.getHeaders();
     String tokioHeaderValue = headers.getFirst("token");
     if (tokioHeaderValue == null || !tokioHeaderValue.equals("AuroraOJ-HDD")) {
@@ -68,7 +68,7 @@ public class CodeExecuteController {
    * @return 评测结果
    */
   @PostMapping("/judge")
-  public Mono<BaseHttpResponse> codeJudge(@RequestBody JudgeRequest judgeRequest, ServerHttpRequest sHttpRequest) {
+  public Mono<BaseHttpResponse<JudgeResponse>> codeJudge(@RequestBody JudgeRequest judgeRequest, ServerHttpRequest sHttpRequest) {
     HttpHeaders headers = sHttpRequest.getHeaders();
     String tokioHeaderValue = headers.getFirst("token");
     if (tokioHeaderValue == null || !tokioHeaderValue.equals("AuroraOJ-HDD")) {
