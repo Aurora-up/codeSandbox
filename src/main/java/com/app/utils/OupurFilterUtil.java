@@ -1,6 +1,5 @@
 package com.app.utils;
 
-
 public class OupurFilterUtil {
   /**
    * 处理编译错误的输出 (删除编译输出中带有的文件路径, 防止文件路径泄漏)
@@ -38,7 +37,8 @@ public class OupurFilterUtil {
 
   /**
    * 处理使用 Java Security Manager 时警告输出
-   *  由于使用 Java Security Manager 会带来 java 代码运行时间统计上的误差，故而弃用 
+   * 由于使用 Java Security Manager 会带来 java 代码运行时间统计上的误差，故而弃用
+   * 
    * @param errorResult 错误输出
    * @return 删除警告后的输出
    */
@@ -53,7 +53,8 @@ public class OupurFilterUtil {
 
   /**
    * 处理使用 Java Security Manager 捕获到了权限异常
-   *  由于使用 Java Security Manager 会带来 java 代码运行时间统计上的误差，故而弃用 
+   * 由于使用 Java Security Manager 会带来 java 代码运行时间统计上的误差，故而弃用
+   * 
    * @param errorResult
    * @return
    */

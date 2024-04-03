@@ -4,8 +4,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.app.common.BaseHttpResponse;
-import com.app.common.StatusEnum;
-
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 

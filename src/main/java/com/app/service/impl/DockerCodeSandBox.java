@@ -27,7 +27,6 @@ import com.app.utils.ProcessUtil;
 import lombok.var;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -38,6 +37,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+
+import javax.annotation.Resource;
 
 /**
  * @author HDD
@@ -62,7 +63,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 	private static final Long TIME_LIMIT = 2000L; // 2s
 	private static final Long Memory_LIMIT = 128 * 1024 * 1024L; // 128MB
 
-	@Autowired
+	@Resource
 	DockerUtil dockerUtil;
 
 	/**
