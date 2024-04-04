@@ -21,7 +21,7 @@ import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
 import com.app.utils.CodeLangAdaptUtil;
 import com.app.utils.DockerUtil;
-import com.app.utils.OupurFilterUtil;
+import com.app.utils.OutputFilterUtil;
 import com.app.utils.ProcessUtil;
 
 import lombok.var;
@@ -98,7 +98,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		// 编译失败 (Compiler Error)
 		if (codeCompileResult.getExitValue() != 0) {
 			/* 代码编译错误输出过滤 */
-			String fixedCompileOutput = OupurFilterUtil.tackleCompileOutput(codeCompileResult.getErrorResult(), lang);
+			String fixedCompileOutput = OutputFilterUtil.tackleCompileOutput(codeCompileResult.getErrorResult(), lang);
 			// codeFileClean(codeFileParentDir.toString());
 			return DRBuilder.resultStatus(1001)
 					.resultMessage(Base64.encode(fixedCompileOutput))
@@ -204,7 +204,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		// 编译失败 (Compiler Error)
 		if (codeCompileResult.getExitValue() != 0) {
 			/* 代码编译错误输出过滤 */
-			String fixedCompileOutput = OupurFilterUtil.tackleCompileOutput(codeCompileResult.getErrorResult(), lang);
+			String fixedCompileOutput = OutputFilterUtil.tackleCompileOutput(codeCompileResult.getErrorResult(), lang);
 			codeFileClean(codeFileParentDir.toString());
 			return JRBuilder.resultStatus(1001)
 					.resultMessage(Base64.encode(fixedCompileOutput))

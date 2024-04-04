@@ -52,7 +52,7 @@ public enum StatusEnum {
                 })
                 .findFirst()
                 .orElseThrow(() -> {
-                  throw new BusinessException(StatusEnum.SYSTEM_NOT_IMPLEMENTED);
+                  throw new BusinessException(StatusEnum.SYSTEM_ERROR);
                 })
                 .getMessage();
   }

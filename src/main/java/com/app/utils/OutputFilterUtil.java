@@ -1,6 +1,6 @@
 package com.app.utils;
 
-public class OupurFilterUtil {
+public class OutputFilterUtil {
   /**
    * 处理编译错误的输出 (删除编译输出中带有的文件路径, 防止文件路径泄漏)
    * 
