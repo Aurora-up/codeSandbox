@@ -1,5 +1,6 @@
 package com.app.controller;
 
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -18,10 +19,13 @@ import com.app.common.StatusEnum;
 import com.app.exception.BusinessException;
 import com.app.module.debug.DebugRequest;
 import com.app.module.debug.DebugResponse;
+import com.app.module.debug.MultiTestCaseDebugRequest;
+import com.app.module.debug.MultiTestCaseDebugResponse;
 import com.app.module.judge.JudgeRequest;
 import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -61,6 +65,30 @@ public class CodeExecuteController {
     }
     LangType.getByLangName(debugRequest.getLang());
     DebugResponse debugResponse = codeSandBox.codeDebug(debugRequest);
+    return BaseHttpResponse.ok(debugResponse, "调试完成")
+        .publishOn(Schedulers.fromExecutor(debugPoolExecutor));
+  }
+
+  /**
+   * 多测试用例评测机调试接口
+   * 
+   * @param debugRequest 调试请求
+   * @return 调试结果
+   */
+  @PostMapping("/multi-debug")
+  public Flux<BaseHttpResponse<MultiTestCaseDebugResponse>> multiTestCaseCodeDebug(@RequestBody MultiTestCaseDebugRequest debugRequest,
+      ServerHttpRequest sHttpRequest) {
+    HttpHeaders headers = sHttpRequest.getHeaders();
+    String tokioHeaderValue = headers.getFirst("token");
+    if (tokioHeaderValue == null || !tokioHeaderValue.equals("AuroraOJ-HDD")) {
+      throw new BusinessException(StatusEnum.NO_AUTH);
+    }
+    if (debugRequest.isNull()) {
+      throw new BusinessException(StatusEnum.NULL_ERROR);
+    }
+    LangType.getByLangName(debugRequest.getLang());
+    List<MultiTestCaseDebugResponse> debugResponse = codeSandBox.multiTestCaseCodeDebug(debugRequest);
+    
     return BaseHttpResponse.ok(debugResponse, "调试完成")
         .publishOn(Schedulers.fromExecutor(debugPoolExecutor));
   }

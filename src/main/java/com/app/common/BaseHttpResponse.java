@@ -1,6 +1,8 @@
 package com.app.common;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.app.exception.BusinessException;
 
@@ -8,6 +10,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -48,50 +51,76 @@ public class BaseHttpResponse<T> implements Serializable {
 
   /**
    * 封装响应成功的请求
-   * @param data 响应数据
+   * 
+   * @param data        响应数据
    * @param description 详细描述
    * @return
    */
   public static <T> Mono<BaseHttpResponse<T>> ok(T data, String description) {
     var builder = new BaseHttpResponseBuilder<T>();
     var resp = builder.statusCode(StatusEnum.SUCCESS.getStatusCode())
-                  .data(data)
-                  .message(StatusEnum.SUCCESS.getMessage())
-                  .description(description)
-                  .timestamp(System.currentTimeMillis())
-                  .build();
+        .data(data)
+        .message(StatusEnum.SUCCESS.getMessage())
+        .description(description)
+        .timestamp(System.currentTimeMillis())
+        .build();
     return Mono.just(resp);
   }
 
   /**
+   * 封装响应成功的请求
+   * 
+   * @param data        响应数据
+   * @param description 详细描述
+   * @return
+   */
+  public static <T> Flux<BaseHttpResponse<T>> ok(List<T> data, String description) {
+    var builder = new BaseHttpResponseBuilder<T>();
+    List<BaseHttpResponse<T>> resultList = new ArrayList<>();
+    for (T item : data) {
+      BaseHttpResponse<T> response = builder
+          .statusCode(StatusEnum.SUCCESS.getStatusCode())
+          .data(item)
+          .message(StatusEnum.SUCCESS.getMessage())
+          .description(description)
+          .timestamp(System.currentTimeMillis())
+          .build();
+      resultList.add(response);
+    }
+    return Flux.fromIterable(resultList);
+  }
+
+  /**
    * 封装响应失败的请求 -- 已定义异常
-   * @param errorStatu 错误状态
+   * 
+   * @param errorStatu  错误状态
    * @param description 错误描述
    * @return
    */
   public static Mono<BaseHttpResponse<BusinessException>> error(BusinessException e) {
     var builder = new BaseHttpResponseBuilder<BusinessException>();
     var resp = builder.statusCode(e.getStatusCode())
-                  .message(StatusEnum.getMessageByStatusCode(e.getStatusCode()))
-                  .description(e.getDescription())
-                  .timestamp(System.currentTimeMillis())
-                  .build();
+        .message(StatusEnum.getMessageByStatusCode(e.getStatusCode()))
+        .description(e.getDescription())
+        .timestamp(System.currentTimeMillis())
+        .build();
     return Mono.just(resp);
   }
 
-    /**
+  /**
    * 封装响应失败的请求 -- 系统内部未知异常
-   * @param errorStatu 错误状态
+   * 
+   * @param errorStatu  错误状态
    * @param description 错误描述
    * @return
    */
   public static Mono<BaseHttpResponse<RuntimeException>> error(RuntimeException e) {
     var builder = new BaseHttpResponseBuilder<RuntimeException>();
     var resp = builder.statusCode(StatusEnum.SYSTEM_ERROR.getStatusCode())
-                  .message(StatusEnum.SYSTEM_ERROR.getMessage())
-                  .description(e.getMessage())
-                  .timestamp(System.currentTimeMillis())
-                  .build();
+        .message(StatusEnum.SYSTEM_ERROR.getMessage())
+        .description(e.getMessage())
+        .timestamp(System.currentTimeMillis())
+        .build();
     return Mono.just(resp);
   }
 }

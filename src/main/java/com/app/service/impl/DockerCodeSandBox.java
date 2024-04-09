@@ -14,6 +14,8 @@ import com.app.common.StatusEnum;
 import com.app.exception.BusinessException;
 import com.app.module.debug.DebugRequest;
 import com.app.module.debug.DebugResponse;
+import com.app.module.debug.MultiTestCaseDebugRequest;
+import com.app.module.debug.MultiTestCaseDebugResponse;
 import com.app.module.execute.RequestArgs;
 import com.app.module.execute.Response;
 import com.app.module.judge.JudgeRequest;
@@ -99,7 +101,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 		if (codeCompileResult.getExitValue() != 0) {
 			/* 代码编译错误输出过滤 */
 			String fixedCompileOutput = OutputFilterUtil.tackleCompileOutput(codeCompileResult.getErrorResult(), lang);
-			// codeFileClean(codeFileParentDir.toString());
+			codeFileClean(codeFileParentDir.toString());
 			return DRBuilder.resultStatus(1001)
 					.resultMessage(Base64.encode(fixedCompileOutput))
 					.build();
@@ -560,5 +562,124 @@ public class DockerCodeSandBox implements CodeSandBox {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	@Override
+	public List<MultiTestCaseDebugResponse> multiTestCaseCodeDebug(MultiTestCaseDebugRequest debugRequest) {
+		List<MultiTestCaseDebugResponse> resultList = new ArrayList<>();
+		var DRBuilder = MultiTestCaseDebugResponse.builder();
+		String code = Base64.decodeStr(debugRequest.getCode());
+		String lang = debugRequest.getLang();
+		List<String> inputList = debugRequest.getTestCases().stream().map(e -> {
+			return Base64.decodeStr(e.getInput());
+		}).toList();
+
+		/* 1. 代码存储隔离 */
+		Path codeFileParentDir = null;
+		Pair<Path, String> ans = tackleCodeStorageAndIsolation(code, inputList, lang, TIME_LIMIT, Memory_LIMIT);
+		codeFileParentDir = ans.getKey();
+
+		/* 2. 启动编译容器，代码编译 */
+		String compileContainerId = dockerUtil.getContainerId(codeFileParentDir.getParent(), COMPILE_ENV_DOCKER_IMAGE,
+				COMPILE_ENV_CONTAINER_NAME, 0);
+		var codeCompileResult = codeCompile(codeFileParentDir.toString(), lang, compileContainerId, ans.getValue());
+
+		// 编译失败 (Compiler Error)
+		if (codeCompileResult.getExitValue() != 0) {
+			/* 代码编译错误输出过滤 */
+			String fixedCompileOutput = OutputFilterUtil.tackleCompileOutput(codeCompileResult.getErrorResult(), lang);
+			codeFileClean(codeFileParentDir.toString());
+			for (int i = 0; i < inputList.size(); i++) {
+				resultList.add(DRBuilder.resultStatus(1001)
+						.resultMessage(Base64.encode(fixedCompileOutput))
+						.build());
+			}
+			return resultList;
+		}
+
+		/* 3. 启动沙箱容器 */
+		String sandBoxContainerId = dockerUtil.getContainerId(codeFileParentDir.getParent(), SANDBOX_DOCKER_IMAGE,
+				SANDBOX_CONTAINER_NAME, 1);
+
+		/* 4. 代码运行 */
+		var codeRunResults = DockerCodeSandBox.codeRun(sandBoxContainerId, codeFileParentDir);
+
+		try {
+			codeRunResults.get(0);
+		} catch (IndexOutOfBoundsException e) {
+			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "多测试用例代码调试结果返回为空, 导致在 codeRun 中出现结果数组访问越界异常. " + e);
+		}
+
+		/* 判题系统正常运行 */
+		Comparator<Response> testCaseIdComparator = Comparator.comparing(Response::getTestCaseId,
+				Comparator.naturalOrder());
+		codeRunResults.sort(testCaseIdComparator);
+
+		for (var response : codeRunResults) {
+			Integer exitCode = response.getExitCode();
+			Integer testCaseId = response.getTestCaseId();
+			String outputMsg = response.getOutputMsg();
+			Long time = response.getTime();
+			Long memory = response.getMemory();
+			var debugResponse = new MultiTestCaseDebugResponse();
+
+			/* 越权操作 */
+			if (exitCode == 1) {
+				debugResponse = DRBuilder.resultStatus(1)
+						.testCaseId(testCaseId)
+						.time(time)
+						.memory(memory)
+						.resultMessage(outputMsg)
+						.build();
+			}
+			/* 判断系统正常运行 */
+			else if (exitCode == 1000) {
+				debugResponse = DRBuilder.resultStatus(1000)
+						.testCaseId(testCaseId)
+						.resultMessage(outputMsg)
+						.time(time)
+						.memory(memory)
+						.build();
+			}
+			/* 运行时错误 RE */
+			else if (exitCode == 1002) {
+				debugResponse = DRBuilder.resultStatus(1002)
+						.testCaseId(testCaseId)
+						.resultMessage(outputMsg)
+						.time(time)
+						.memory(memory)
+						.build();
+			}
+			/* 运行超时 TLE */
+			else if (exitCode == 1003) {
+				debugResponse = DRBuilder.resultStatus(1003)
+						.testCaseId(testCaseId)
+						.resultMessage(outputMsg)
+						.time(-1L)
+						.memory(memory)
+						.build();
+			}
+			/* 运行占用内存超出限制 MLE */
+			else if (exitCode == 1004) {
+				debugResponse = DRBuilder.resultStatus(1004)
+						.testCaseId(testCaseId)
+						.resultMessage(outputMsg)
+						.time(time)
+						.memory(-1L)
+						.build();
+			}
+			/* 未知错误 */
+			else {
+				debugResponse = DRBuilder.resultStatus(777)
+						.testCaseId(testCaseId)
+						.resultMessage(Base64.encode("未知错误: ") + outputMsg)
+						.time(time)
+						.memory(memory)
+						.build();
+			}
+			resultList.add(debugResponse);
+		}
+		codeFileClean(codeFileParentDir.toString());
+		return resultList;
 	}
 }

@@ -2,8 +2,13 @@ package com.app.service;
 
 import com.app.module.debug.DebugRequest;
 import com.app.module.debug.DebugResponse;
+import com.app.module.debug.MultiTestCaseDebugRequest;
+import com.app.module.debug.MultiTestCaseDebugResponse;
 import com.app.module.judge.JudgeRequest;
 import com.app.module.judge.JudgeResponse;
+
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,4 +31,12 @@ public interface CodeSandBox {
 	 * @return 代码评审结果
 	 */
 	JudgeResponse codeJudge(JudgeRequest judgeRequest);
+
+
+	/**
+	 * 多测试用例代码调试
+	 * @param debugRequest 代码调试请求
+	 * @return 代码调试结果
+	 */
+	List<MultiTestCaseDebugResponse> multiTestCaseCodeDebug(MultiTestCaseDebugRequest debugRequest);
 }
