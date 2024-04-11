@@ -17,8 +17,8 @@ import reactor.core.publisher.Mono;
 public class GlobalExceptionHandler {
   /**
    * 处理已定义的异常状态
-   * @param e
-   * @return
+	 * @param e 异常
+	 * @return 响应结果
    */
   @ExceptionHandler(BusinessException.class)
   public Mono<BaseHttpResponse<BusinessException>> businessExceptionHandler(BusinessException e) {
@@ -28,8 +28,8 @@ public class GlobalExceptionHandler {
 
   /**
    * 处理未定义的系统运行时异常
-   * @param e
-   * @return
+	 * @param e 异常
+	 * @return 响应结果
    */
   @ExceptionHandler(RuntimeException.class)
   public Mono<BaseHttpResponse<RuntimeException>> runtimeExceptionHandler(RuntimeException e) {

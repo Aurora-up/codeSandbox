@@ -570,13 +570,15 @@ public class DockerCodeSandBox implements CodeSandBox {
 		var DRBuilder = MultiTestCaseDebugResponse.builder();
 		String code = Base64.decodeStr(debugRequest.getCode());
 		String lang = debugRequest.getLang();
+		Long timeLimit = debugRequest.getTimeLimit();
+		Long memoryLimit = debugRequest.getMemoryLimit();
 		List<String> inputList = debugRequest.getTestCases().stream().map(e -> {
 			return Base64.decodeStr(e.getInput());
 		}).toList();
 
 		/* 1. 代码存储隔离 */
 		Path codeFileParentDir = null;
-		Pair<Path, String> ans = tackleCodeStorageAndIsolation(code, inputList, lang, TIME_LIMIT, Memory_LIMIT);
+		Pair<Path, String> ans = tackleCodeStorageAndIsolation(code, inputList, lang, timeLimit, memoryLimit);
 		codeFileParentDir = ans.getKey();
 
 		/* 2. 启动编译容器，代码编译 */

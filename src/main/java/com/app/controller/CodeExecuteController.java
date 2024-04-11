@@ -25,7 +25,6 @@ import com.app.module.judge.JudgeRequest;
 import com.app.module.judge.JudgeResponse;
 import com.app.service.CodeSandBox;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -76,7 +75,7 @@ public class CodeExecuteController {
    * @return 调试结果
    */
   @PostMapping("/multi-debug")
-  public Flux<BaseHttpResponse<MultiTestCaseDebugResponse>> multiTestCaseCodeDebug(@RequestBody MultiTestCaseDebugRequest debugRequest,
+  public Mono<BaseHttpResponse<List<MultiTestCaseDebugResponse>>> multiTestCaseCodeDebug(@RequestBody MultiTestCaseDebugRequest debugRequest,
       ServerHttpRequest sHttpRequest) {
     HttpHeaders headers = sHttpRequest.getHeaders();
     String tokioHeaderValue = headers.getFirst("token");

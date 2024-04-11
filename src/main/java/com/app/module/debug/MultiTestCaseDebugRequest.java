@@ -3,7 +3,7 @@ package com.app.module.debug;
 import java.util.List;
 
 import com.app.module.judge.TestCase;
-import com.google.common.base.Function;
+import java.util.function.Function;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,11 +33,11 @@ public class MultiTestCaseDebugRequest {
 	 */
 	String lang;
 	/**
-	 * 时间限制
+	 * 时间限制 (单位 : ms)
 	 */
 	Long timeLimit;
 	/**
-	 * 内存限制
+	 * 内存限制 (单位: B)
 	 */
 	Long memoryLimit;
 	/**

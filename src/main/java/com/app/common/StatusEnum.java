@@ -38,7 +38,7 @@ public enum StatusEnum {
   private final String description;
 
   /**
-   * 根据状态吗获取状态码信息
+   * 根据状态码获取状态码信息
    * 
    * @param statusCode 状态码
    */
