@@ -1,10 +1,8 @@
-#include<iostream>
+#include <iostream>
 using namespace std;
 
-int n , m;
-
-int main(){
-    cin >> n >> m;
-    cout << n + m  << endl;
+int main() {
+    int a = 0, b = 0;
+    cout << a + b << endl;
     return 0;
 }

@@ -105,15 +105,13 @@ async fn child_process(
         .stderr(Stdio::piped())
         .spawn()
         .expect("执行命令异常");
-    let _current_time = SystemTime::now();
-    let process_spawn_time = _current_time.duration_since(UNIX_EPOCH).expect("获取系统时间错误!").as_millis();
-
     if let Some(mut stdin) = run_process.stdin.take() {
         stdin
             .write_all(input_data.as_bytes())
-            .await
-            .expect("无法将测试用例重定向至执行进程的输入");
+            .await;
     }
+    let _current_time = SystemTime::now();
+    let process_spawn_time = _current_time.duration_since(UNIX_EPOCH).expect("获取系统时间错误!").as_millis();
 
     let pid = run_process.id().expect("无法获取到执行进程 ID");
 
@@ -245,6 +243,7 @@ async fn main() {
     }
     if let Ok(output_json) = serde_json::to_string(&responses) {
         println!("{}", general_purpose::STANDARD.encode(output_json));
+        // println!("{}", output_json);
     } else {
         eprintln!("Failed to convert responses to JSON");
     }

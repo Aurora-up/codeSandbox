@@ -75,6 +75,12 @@ public class ProcessUtil {
 			}
 		} catch (IOException e) {
 			throw new BusinessException(StatusEnum.SYSTEM_ERROR, "获取进程输出异常. " + e);
+		} finally {
+			try {
+				reader.close(); // 关闭流
+			} catch (IOException e) {
+				e.printStackTrace(); // 关闭流时发生异常，打印异常信息
+			}
 		}
 		return out.toString();
 	}
