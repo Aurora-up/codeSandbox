@@ -271,7 +271,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 							.noPassTestCaseId(response.getTestCaseId())
 							.time(response.getTime())
 							.memory(response.getMemory())
-							.resultMessage(Base64.encode("Wrong Answer"))
+							.resultMessage(outputMsg)
 							.build();
 					break;
 				}
@@ -281,7 +281,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 				judgeResponse = JRBuilder.resultStatus(1002)
 						.passTestCasesNumber(passTestCasesNumber)
 						.noPassTestCaseId(response.getTestCaseId())
-						.resultMessage(Base64.encode(outputMsg))
+						.resultMessage(outputMsg)
 						.build();
 				break;
 			}
@@ -314,7 +314,7 @@ public class DockerCodeSandBox implements CodeSandBox {
 						.noPassTestCaseId(response.getTestCaseId())
 						.time(response.getTime())
 						.memory(response.getMemory())
-						.resultMessage(Base64.encode("Permission Deny: " + outputMsg))
+						.resultMessage(Base64.encode("Permission Deny: ") + outputMsg)
 						.build();
 				break;
 			}

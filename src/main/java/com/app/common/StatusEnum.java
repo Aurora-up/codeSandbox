@@ -17,7 +17,7 @@ import lombok.Getter;
 public enum StatusEnum {
   SUCCESS(0, "ok", ""),
   PARAMS_ERROR(40000, "请求参数错误", ""),
-  NULL_ERROR(40001, "请求数据为空", ""),
+  NULL_ERROR(40001, "请求数据为空或请求数据字段不正确", ""),
   NO_AUTH(40003, "你没有权限", ""),
   SYSTEM_ERROR(50000, "系统内部异常", ""),
   SYSTEM_NOT_IMPLEMENTED(50001, "系统暂不支持该语言", "");
