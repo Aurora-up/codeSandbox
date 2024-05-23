@@ -165,7 +165,7 @@ async fn child_process(
                         response.set_memory(use_memory);
                         if use_memory == memory_limit + 1 {
                             response.set_exit_code(1004);
-                            response.set_output_msg("Memory Exceeded Limit");
+                            response.set_output_msg(general_purpose::STANDARD.encode("Memory Exceeded Limit"));
                         }
                     }
                     result_sender.send(response).await.unwrap();
@@ -189,7 +189,7 @@ async fn child_process(
 
             response.set_exit_code(1003);
             response.set_time((time_limit + 1).into());
-            response.set_output_msg("Time Exceeded Limit");
+            response.set_output_msg(general_purpose::STANDARD.encode("Time Exceeded Limit"));
 
             result_sender.send(response).await.unwrap();
         }
